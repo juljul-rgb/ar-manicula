@@ -1,0 +1,15 @@
+# Application AR de la carte de visite Manicula : pas d'indexation ni de collecte automatisée.
+User-agent: *
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /

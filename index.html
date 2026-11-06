@@ -1,0 +1,1623 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>Carte AR – Zone 3</title>
+  <link rel="icon" href="data:,">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #000; font-family: system-ui, sans-serif; }
+    #ar { position: fixed; inset: 0; }
+    /* ---- consigne (« Visez la carte »…) : pas un bouton, juste une indication. 3 propositions : ?consigne=a|b|c ---- */
+    #etat { position: fixed; z-index: 9; pointer-events: none; color: #fff; text-align: center;
+      font: 600 17px/1.35 system-ui, sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,.85), 0 0 14px rgba(0,0,0,.45); }
+    /* icône de la consigne : carte (mode carte) ou téléphone qui balaie (mode n'importe où) */
+    #etat::before { content: ''; display: block; margin: 0 auto 12px; width: 46px; height: 46px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.7));
+      background: center / contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='5' width='19' height='14' rx='2.5'/%3E%3Ccircle cx='8.5' cy='11' r='2.3'/%3E%3Cpath d='M5 16.4c.7-1.6 2-2.4 3.5-2.4s2.8.8 3.5 2.4'/%3E%3Cline x1='14.5' y1='10' x2='18.5' y2='10'/%3E%3Cline x1='14.5' y1='13.5' x2='18.5' y2='13.5'/%3E%3C/svg%3E");
+      animation: flotte 2.4s ease-in-out infinite; }
+    body.libre #etat::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='8' y='2.5' width='8' height='13' rx='1.8'/%3E%3Cline x1='11' y1='13' x2='13' y2='13'/%3E%3Cpath d='M3 18.5 12 22l9-3.5L12 15z' stroke-dasharray='1.6 1.6'/%3E%3C/svg%3E");
+      animation: balaie 2.4s ease-in-out infinite; }
+    @keyframes flotte { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+    @keyframes balaie { 0%, 100% { transform: translateX(-9px) rotate(-6deg); } 50% { transform: translateX(9px) rotate(6deg); } }
+    /* A — texte seul, au milieu de l'écran */
+    body.consigne-a #etat { left: 24px; right: 24px; top: 50%; transform: translateY(-50%); }
+    /* B — viseur : 4 coins au format de la carte, texte dessous */
+    body.consigne-b #etat { left: 24px; right: 24px; top: 50%; transform: translateY(-38%); }
+    body.consigne-b:not(.libre) #etat::before { width: min(70vw, 300px); height: auto; aspect-ratio: 85 / 55; margin-bottom: 18px;
+      --c: rgba(255,255,255,.95); --l: 30px; --e: 3px; background:
+        linear-gradient(var(--c) 0 0) left top / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) left top / var(--e) var(--l) no-repeat,
+        linear-gradient(var(--c) 0 0) right top / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) right top / var(--e) var(--l) no-repeat,
+        linear-gradient(var(--c) 0 0) left bottom / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) left bottom / var(--e) var(--l) no-repeat,
+        linear-gradient(var(--c) 0 0) right bottom / var(--l) var(--e) no-repeat, linear-gradient(var(--c) 0 0) right bottom / var(--e) var(--l) no-repeat;
+      animation: respireViseur 2.4s ease-in-out infinite; }
+    @keyframes respireViseur { 0%, 100% { transform: scale(1); opacity: .95; } 50% { transform: scale(1.04); opacity: .7; } }
+    /* C — bandeau en bas, en dégradé, juste au-dessus du sélecteur */
+    body.consigne-c #etat { left: 0; right: 0; bottom: 0; padding: 70px 24px calc(132px + env(safe-area-inset-bottom));
+      background: linear-gradient(to top, rgba(4,20,32,.78) 35%, rgba(4,20,32,0)); font-size: 16px; }
+    body.consigne-c #etat::before { width: 34px; height: 34px; margin-bottom: 8px; }
+    body.consigne-c #info { z-index: 10; }
+    /* ---- sélecteur de vue à 3 positions, en verre dépoli, sur toute la largeur, avec pastille qui glisse ---- */
+    #reglages {
+      position: fixed; bottom: calc(14px + env(safe-area-inset-bottom)); left: 12px; right: 12px; z-index: 10;
+      max-width: 560px; margin: 0 auto; display: flex; padding: 5px; border-radius: 999px; isolation: isolate;
+      background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .4);
+      -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, .25), inset 0 1px 0 rgba(255, 255, 255, .35);
+    }
+    #reglages .pastille {
+      position: absolute; z-index: -1; top: 5px; bottom: 5px; left: 5px; width: 0; border-radius: 999px;
+      background: rgba(255, 255, 255, .93); box-shadow: 0 2px 10px rgba(0, 0, 0, .22);
+      transition: left .35s cubic-bezier(.3,1.3,.5,1), width .35s cubic-bezier(.3,1.3,.5,1);
+    }
+    #reglages button {
+      flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+      background: none; border: 0; border-radius: 999px; padding: 10px 6px; color: #fff;
+      font: 600 clamp(12.5px, 3.5vw, 15px)/1 system-ui, sans-serif; white-space: nowrap;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, .45); transition: color .25s; -webkit-tap-highlight-color: transparent;
+    }
+    #reglages button.actif { color: #0a2233; text-shadow: none; }
+    #reglages svg { flex: none; width: 1.45em; height: 1.15em; }
+    #reglages button[data-mode="det"] svg { width: 1.15em; height: 1.15em; }
+    #reglages button[data-mode="imm"] svg { width: 1.65em; height: 1.05em; }
+    /* écran étroit : style « barre d'onglets » (icône au-dessus, nom dessous) */
+    @media (max-width: 369px) {
+      #reglages button { flex-direction: column; gap: 3px; padding: 6px 4px; font-size: 11.5px; }
+      #reglages svg { font-size: 16px; }
+    }
+    /* bouton Légende (même icône que le site) */
+    #bLegende {
+      position: fixed; top: calc(42px + env(safe-area-inset-top)); left: 12px; z-index: 11; display: none;
+      flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0;
+      color: #fff; font: 600 11px system-ui, sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,.6);
+    }
+    #bLegende span.rond {
+      width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center;
+      background: rgba(255, 255, 255, .9); box-shadow: 0 4px 14px rgba(0,0,0,.28);
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    #bLegende.ouvert span.rond { background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,.45), 0 4px 14px rgba(0,0,0,.28); }
+    #info { position: fixed; bottom: calc(74px + env(safe-area-inset-bottom)); left: 0; right: 0; padding: 0 16px; text-align: center; z-index: 10;
+      color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000; pointer-events: none; }
+    #legende {
+      position: fixed; top: calc(112px + env(safe-area-inset-top)); left: 12px; z-index: 10; display: none;
+      background: rgba(255, 255, 255, .92); color: #1c2733; border-radius: 14px; padding: 10px 12px;
+      -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); box-shadow: 0 8px 24px rgba(0,0,0,.25);
+      font-size: 12px; line-height: 1.55; max-width: calc(100% - 48px); max-height: 50vh; overflow: auto;
+    }
+    #legende .tete { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 4px; }
+    #legende .tete b { font-size: 13px; }
+    #legende .fermer { background: none; border: 0; padding: 2px; color: #5a6f80; line-height: 0; }
+    #legende .l { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    #legende i { width: 10px; height: 10px; border-radius: 50%; flex: none; border: 1.5px solid; }
+    #legende small { opacity: .6; }
+    #legende.immersive i { display: none; }   /* en vue 3D, les couleurs des pastilles ne correspondent pas aux organismes */
+    /* fiche d'un organisme touché (reprise de la fiche 3D du site : verre sombre, liseré de la couleur de l'espèce) */
+    #fiche {
+      position: fixed; z-index: 12; display: none; transform: translate(-50%, calc(-100% - 14px));
+      background: rgba(14, 24, 34, .84); color: #fff; border-radius: 12px; padding: 9px 12px 8px;
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: 0 8px 22px rgba(0,0,0,.35);
+      font: 13px/1.35 system-ui, sans-serif; pointer-events: none; white-space: nowrap;
+    }
+    #fiche::after { content: ''; position: absolute; left: 50%; bottom: -6px; width: 12px; height: 12px;
+      background: rgba(14, 24, 34, .84); transform: translateX(-50%) rotate(45deg); }
+    #fiche .pe { display: flex; align-items: center; gap: 8px; border-left: 3px solid; padding-left: 8px; }
+    #fiche .pe-ico { line-height: 0; flex: none; }
+    #fiche .pe-ico svg { width: 28px; height: 28px; }
+    #fiche .pe-rond { width: 11px; height: 11px; border-radius: 50%; border: 2.5px solid; flex: none; }
+    #fiche .pe-noms { display: flex; flex-direction: column; }
+    #fiche .pe-nom { font-weight: 700; }
+    #fiche .pe-sci { font-size: 11.5px; opacity: .75; }
+    #fiche .prof { display: flex; align-items: center; gap: 6px; margin-top: 6px; padding-left: 11px; font-size: 12.5px; }
+    /* bouton contact (bas droite) + panneau */
+    /* boutons ronds avec un titre dessous (Contact, Langue, Déplacer) */
+    .bRond { display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0;
+      color: #fff; font: 600 11px system-ui, sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,.6); -webkit-tap-highlight-color: transparent; }
+    .bRond .rond { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; box-sizing: border-box;
+      background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .38); color: #fff;
+      -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+      box-shadow: 0 6px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.35); }
+    /* contact : en haut à droite, sur l'écran de choix comme dans la vue AR (au-dessus de l'écran d'accueil) */
+    #bContact { position: fixed; right: 12px; top: calc(12px + env(safe-area-inset-top)); z-index: 21; }
+    #bContact.actif .rond { background: rgba(255,255,255,.88); color: #0a2233; }
+    /* ================= ÉCRAN DE CHOIX (minimaliste) =================
+       Police Poppins (comme la carte de visite) ; blanc sur bleu nuit, aucun cyan ; beaucoup d'air. */
+    #accueil { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+      padding: calc(14px + env(safe-area-inset-top)) 20px calc(8px + env(safe-area-inset-bottom)); box-sizing: border-box; overflow-y: auto;
+      background: radial-gradient(120% 80% at 50% 30%, #0c2536 0%, #071823 55%, #050f17 100%); color: #eaf4f9;
+      font: 400 14px Poppins, system-ui, sans-serif; -webkit-font-smoothing: antialiased; transition: opacity .6s; }
+    #accueil.fini { opacity: 0; pointer-events: none; }
+    #accueil .haut { width: 100%; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; position: relative; min-height: 56px; }
+    #accueil .haut #logoSite { grid-column: 2; grid-row: 1; }
+    #logoSite { line-height: 0; border-radius: 50%; -webkit-tap-highlight-color: transparent; }
+    #logoSite img { width: 34px; height: 34px; margin-top: 2px; }
+    #accueil .milieu { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; width: 100%; padding: 12px 0; }
+    /* Langue et Contact sur l'écran de choix : icône fine dans un cercle fin, petit libellé */
+    #bLangue { grid-column: 1; grid-row: 1; justify-self: start; }
+    .bRond > span:last-child:not(.rond) { display: block; line-height: 1.2; white-space: nowrap; }
+    body.menu .bRond { gap: 5px; color: #8fb0c2; font: 500 10px Poppins, system-ui, sans-serif; letter-spacing: .02em; text-shadow: none; }
+    body.menu .bRond .rond { width: 38px; height: 38px; background: none; border: 1px solid rgba(255,255,255,.16); color: #d6e7f0;
+      box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    body.menu .bRond .rond svg { width: 17px; height: 17px; }
+    body.menu #bContact { right: 20px; top: calc(14px + env(safe-area-inset-top)); }
+    body.menu #bContact.actif .rond { background: #f1f5f7; color: #0b2231; border-color: #f1f5f7; }
+    body.menu #contact { top: calc(76px + env(safe-area-inset-top)); right: 20px; }
+    /* menu des langues (comme sur le site : emoji + nom) */
+    #menuLangue { display: none; position: absolute; left: 0; top: calc(100% + 6px); z-index: 2; padding: 6px; border-radius: 16px;
+      background: rgba(255,255,255,.97); box-shadow: 0 10px 30px rgba(0,0,0,.35); flex-direction: column; gap: 2px; }
+    #menuLangue.ouvert { display: flex; }
+    #menuLangue button { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 0; border-radius: 12px; background: none;
+      color: #1c2733; font: 500 14px Poppins, system-ui, sans-serif; text-align: left; }
+    #menuLangue button.actif { background: #edf2f5; color: #0b2231; font-weight: 600; }
+    #menuLangue .emoji { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; border: 1.5px solid #dfe6ec; background: #fff; }
+    #menuLangue button.actif .emoji { border-color: #0b2231; }
+    #barre { width: 160px; height: 3px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+    #barre i { display: block; height: 100%; width: 0; border-radius: 3px; background: #f1f5f7; transition: width .35s ease-out; }
+    #accueilTexte { color: #8fb0c2; font-size: 13px; }
+    #choix { display: none; flex-direction: column; align-items: stretch; width: min(350px, 100%); }
+    #accueil.choisir #choix { display: flex; }
+    #accueil.choisir #barre, #accueil.choisir #accueilTexte { display: none; }
+    #accueil:not(.choisir) #bLangue, #accueil:not(.choisir) #menuLangue { display: none; }
+    /* accroche */
+    #choix .accroche { text-align: center; }
+    #choix .accroche h1 { text-wrap: balance; }
+    #choix .accroche h1 { margin: 0; font: 300 clamp(20px, 6vw, 23px)/1.22 Poppins, system-ui, sans-serif; letter-spacing: -.01em; color: #fff; }
+    #choix .accroche h1 b { font-weight: 600; }
+    #choix .accroche p { margin: 8px auto 0; max-width: 300px; text-wrap: balance; font: 400 12.5px/1.45 Poppins, system-ui, sans-serif; color: #8fb0c2; }
+    /* question + 2 boutons regroupés dans un cadre très léger */
+    #choix .panneau { margin-top: 30px; padding: 20px 14px 14px; border-radius: 26px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.035);
+      display: flex; flex-direction: column; gap: 10px; }
+    #choix .question { margin: 0 0 6px; text-align: center; color: #fff; font: 600 17px/1.25 Poppins, system-ui, sans-serif; letter-spacing: -.01em; }
+    #choix .opt { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; text-align: left;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2); color: #fff; text-decoration: none;
+      font: 600 14.5px/1.25 Poppins, system-ui, sans-serif; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #choix .opt:active { background: rgba(255,255,255,.16); }
+    #choix .opt > span:last-child { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+    a#cQuickLook { box-sizing: border-box; width: 100%; }
+    #choix .opt .ico { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #f1f5f7; color: #0b2231; }
+    #choix .opt img.ico { padding: 10px; box-sizing: border-box; }
+    #choix .opt small { display: block; margin-top: 2px; font-weight: 400; font-size: 11.5px; color: #9fbccb; }
+    #choix .opt[disabled] { opacity: .45; cursor: default; }
+    #choix .note { text-align: center; font-size: 12px; line-height: 1.4; color: #8fb0c2; }
+    #choix .note:empty { display: none; }
+    #accueil .retour { display: none; margin-top: 4px; padding: 10px 20px; border-radius: 999px; border: 1px solid rgba(255,255,255,.3);
+      background: transparent; color: #fff; font: 500 14px Poppins, system-ui, sans-serif; }
+    /* Information : 5 cercles fins ; un toucher affiche une petite phrase sous le cercle (place réservée, rien ne bouge) */
+    #infoIle { width: min(350px, 100%); }
+    #infoIle .titreInfo { display: flex; align-items: center; gap: 12px; color: #6f93a7; font: 500 11.5px/1 Poppins, system-ui, sans-serif; letter-spacing: .03em; margin-bottom: 12px; }
+    #infoIle .titreInfo::before, #infoIle .titreInfo::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, rgba(127,169,192,.28)); }
+    #infoIle .titreInfo::after { background: linear-gradient(270deg, transparent, rgba(127,169,192,.28)); }
+    #infoIle .rangee { position: relative; display: flex; justify-content: center; gap: 22px; padding-bottom: 30px; }
+    #infoIle .item { position: relative; width: 40px; }
+    #infoIle .cercle { width: 40px; height: 40px; border-radius: 50%; padding: 0; display: grid; place-items: center; color: #a9c6d4; cursor: pointer;
+      background: transparent; border: 1px solid rgba(255,255,255,.16); transition: border-color .25s, color .25s, background .25s; -webkit-tap-highlight-color: transparent; }
+    #infoIle .item.actif .cercle { border-color: #fff; color: #fff; background: rgba(255,255,255,.06); }
+    #infoIle .cap { position: absolute; top: 49px; left: 0; white-space: nowrap; font: 400 12.5px/1.35 Poppins, system-ui, sans-serif; color: #cfe2ec;
+      opacity: 0; pointer-events: none; transition: opacity .25s; }
+    #infoIle .item.actif .cap { opacity: 1; }
+    /* mode « n'importe où » (WebXR) : la page devient une couche transparente au-dessus de la caméra */
+    body.xr, html.xr { background: transparent !important; }
+    body.xr #ar { display: none; }
+    #bReplacer { display: none; position: fixed; right: 12px; top: calc(86px + env(safe-area-inset-top)); z-index: 11;
+      flex-direction: column; align-items: center; gap: 4px; background: none; border: 0; padding: 0;
+      color: #fff; font: 600 11px system-ui, sans-serif; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+    #bReplacer .rond, #bOptions { background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .38);
+      -webkit-backdrop-filter: blur(14px) saturate(160%); backdrop-filter: blur(14px) saturate(160%);
+      box-shadow: 0 6px 20px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.35); }
+    #bReplacer .rond { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; box-sizing: border-box; }
+    /* retour à l'écran de choix (en haut à gauche ; le bouton Légende est juste dessous) */
+    /* Revenir aux options : tout en haut, discret. 2 variantes : ?retour=a (sans capsule) | b (capsule très fine) */
+    #bOptions { position: fixed; left: 8px; top: calc(6px + env(safe-area-inset-top)); z-index: 11; display: flex; align-items: center; gap: 2px;
+      height: 24px; padding: 0 10px 0 5px; border-radius: 999px; color: rgba(255,255,255,.92); font: 500 12px system-ui, sans-serif;
+      text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+    #bOptions svg { width: 13px; height: 13px; }
+    body.retour-a #bOptions { background: none !important; border: 0 !important; box-shadow: none !important;
+      -webkit-backdrop-filter: none !important; backdrop-filter: none !important; padding-left: 2px; }
+    body.retour-b #bOptions { background: rgba(255,255,255,.08) !important; border: 1px solid rgba(255,255,255,.32) !important; box-shadow: none !important;
+      -webkit-backdrop-filter: blur(6px) !important; backdrop-filter: blur(6px) !important; text-shadow: 0 1px 2px rgba(0,0,0,.45); }
+    body.xr.posee #bReplacer { display: flex; }
+    body.xr.posee #etat { display: none; }
+    #contact {
+      position: fixed; right: 12px; top: calc(80px + env(safe-area-inset-top)); z-index: 22; display: none;
+      width: min(270px, calc(100% - 24px)); padding: 16px 14px 8px; border-radius: 18px; color: #1c2733;
+      background: rgba(255, 255, 255, .94); box-shadow: 0 10px 30px rgba(0,0,0,.28);
+      -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); font: 14px/1.4 system-ui, sans-serif;
+    }
+    #contact .entete { display: flex; align-items: center; gap: 12px; padding: 0 2px 12px; border-bottom: 1px solid #e3e8ec; }
+    #contact .entete img { width: 52px; height: 52px; flex: none; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2px #fff, 0 0 0 3px #d7e3ea; }
+    #contact .nom { font: 700 16px/1.2 system-ui, sans-serif; }
+    #contact .role { color: #5a6f80; margin-top: 2px; font-size: 12.5px; }
+    #contact a { display: flex; align-items: center; gap: 12px; color: #1c2733; text-decoration: none;
+      padding: 12px 2px; border-bottom: 1px solid #eef1f4; font-weight: 500; }
+    #contact a:last-child { border-bottom: 0; }
+    #contact a svg { flex: none; color: #0b84c6; }
+    #contact a .txt { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #contact a .chev { color: #a9b6c1; }
+    #contact a:not(.ajouter) { height: 50px; padding-top: 0; padding-bottom: 0; box-sizing: border-box; }   /* toutes les lignes à la même hauteur */
+    #contact a .txt .titre { display: block; line-height: 1.15; }
+    #contact a .txt .source { display: block; font-size: 11.5px; line-height: 1.15; color: #7b8c99; font-weight: 400; margin-top: 2px; }
+    #contact a:nth-last-child(2) { border-bottom: 0; }
+    #contact a.ajouter { justify-content: center; gap: 8px; margin: 10px auto 8px; padding: 11px 20px; width: fit-content;
+      border: 0; border-radius: 999px; background: #0b84c6; color: #fff; font-weight: 600; box-shadow: 0 4px 12px rgba(11,132,198,.35); }
+    #contact a.ajouter svg { color: #fff; }
+  
+    /* ===== Mise en page v2 : accroche et Information alignées à gauche ===== */
+    #choix .accroche { text-align: left; }
+    #choix .accroche h1 { font: 300 27px/1.15 Poppins, system-ui, sans-serif; letter-spacing: -.02em; text-wrap: balance; }
+    #choix .accroche h1 b { font-weight: 600; color: #fff; }
+    #choix .accroche p { margin: 12px 0 0; max-width: none; text-wrap: pretty; font: 400 13.5px/1.55 Poppins, system-ui, sans-serif; color: #a9c3d1; }
+    #choix .accroche p b { color: #fff; font-weight: 600; }
+    #choix .accroche::before { content: ''; display: block; width: 28px; height: 2px; border-radius: 2px; background: #0ea5e9; margin-bottom: 14px; }
+    #infoIle .titreInfo { justify-content: flex-start; }
+    #infoIle .titreInfo::before { display: none; }
+    #infoIle .sousInfo { margin: 0 0 16px; text-align: left; font: italic 300 12.5px/1.5 Poppins, system-ui, sans-serif; color: #a9c3d1; }
+    #infoIle .rangee { justify-content: space-between; padding-bottom: 0; gap: 0; }
+    #infoIle .capZone { min-height: 38px; margin-top: 12px; font: 400 13px/1.45 Poppins, system-ui, sans-serif; color: #e6f1f6; text-align: left; }
+    #infoIle .capZone b { color: #fff; font-weight: 600; }
+
+    /* ===== v3 ===== */
+    #choix .accroche::before { display: none; }
+    #choix .accroche h1::after { content: ''; display: block; width: 28px; height: 2px; border-radius: 2px; background: #0ea5e9; margin: 14px 0 2px; }
+    #infoIle .titreInfo { justify-content: center; }
+    #infoIle .titreInfo::before { display: block; }
+    #choix #cLibre, #choix #cQuickLook { padding: 10px 14px; gap: 12px; border-radius: 15px; }
+    #choix #cLibre .ico, #choix #cQuickLook .ico { width: 34px; height: 34px; }
+    #choix #cLibre .ico svg { width: 19px; height: 19px; }
+    #choix #cQuickLook img.ico { padding: 8px; }
+    #choix #cLibre > span:last-child, #choix #cQuickLook > span:last-child { font-size: 13.5px; font-weight: 500; line-height: 1.3; }
+    #choix .opt small:empty { display: none; }
+
+    /* ===== v4 : tout tient sur un écran, Information en tiroir ===== */
+    #choix .accroche h1 { font-size: clamp(21px, 6.4vw, 25px); line-height: 1.18; white-space: nowrap; }
+    #choix .accroche h1::after { margin: 12px 0 0; }
+    #choix .accroche p { margin-top: 10px; font-size: 13px; line-height: 1.5; }
+    #choix .panneau { margin-top: 22px; padding: 16px 12px 12px; gap: 10px; }
+    #choix .question { font-size: 16px; margin-bottom: 4px; }
+    #accueil .milieu { padding-bottom: 64px; }
+    /* option B : plus discrète que la carte */
+    #choix #cLibre, #choix #cQuickLook { background: rgba(255,255,255,.03); border-color: rgba(255,255,255,.10); }
+    #choix #cLibre .ico, #choix #cQuickLook .ico { background: rgba(241,245,247,.55); }
+    #choix #cLibre > span:last-child, #choix #cQuickLook > span:last-child { color: #c9d9e2; }
+    #choix #cLibre small, #choix #cQuickLook small { display: block; font-size: 11.5px; font-weight: 400; color: #9fbccb; }
+    /* tiroir Information */
+    #infoIle { position: fixed; left: 0; right: 0; bottom: 0; width: auto; z-index: 26; box-sizing: border-box;
+      padding: 0 20px calc(12px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0;
+      background: transparent; transition: background .3s, box-shadow .3s; }
+    #infoIle.ouvert { background: #0c2232; box-shadow: 0 -10px 30px rgba(0,0,0,.45); border-top: 1px solid rgba(255,255,255,.10); }
+    #infoIle .bInfo { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px auto 0; padding: 9px 16px;
+      border-radius: 999px; border: 1px solid rgba(255,255,255,.22); background: rgba(255,255,255,.06); color: #dbe9f0;
+      font: 500 13px/1 Poppins, system-ui, sans-serif; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #infoIle .bInfo .i { width: 18px; height: 18px; border-radius: 50%; border: 1.4px solid currentColor; display: grid; place-items: center;
+      font: italic 700 11px/1 Georgia, serif; }
+    #infoIle .bInfo .fl { transition: transform .3s; }
+    #infoIle.ouvert .bInfo .fl { transform: rotate(180deg); }
+    #infoIle .tiroir { max-height: 0; overflow: hidden; opacity: 0; transition: max-height .35s ease, opacity .25s; }
+    #infoIle.ouvert .tiroir { max-height: 300px; opacity: 1; }
+    #infoIle .sousInfo { margin: 16px 0 16px; }
+    #infoIle .capZone { min-height: 40px; }
+    #accueil:not(.choisir) #infoIle { display: none; }
+
+    /* ===== v5 ===== */
+    #accueil .milieu { justify-content: center; padding: 0 0 92px; }
+    #choix .accroche h1 { font-size: clamp(23px, 7vw, 27px); }
+    #choix .accroche h1::after { margin: 16px 0 0; }
+    #choix .accroche p { margin-top: 14px; font-size: 14px; line-height: 1.55; }
+    #choix .lieu { display: flex; align-items: center; gap: 6px; margin-top: 12px; color: #7fa6ba; font: 500 12px/1.2 Poppins, system-ui, sans-serif; }
+    #choix .panneau { margin-top: 34px; padding: 20px 14px 14px; gap: 12px; }
+    #choix .question { font-size: 17px; margin-bottom: 6px; }
+    #choix #cCarte { padding: 18px 16px; }
+    #voileInfo { position: fixed; inset: 0; z-index: 25; background: rgba(3,12,20,.35); -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+      opacity: 0; pointer-events: none; transition: opacity .3s; }
+    body.infoOuverte #voileInfo { opacity: 1; pointer-events: auto; }
+    #accueil:not(.choisir) #voileInfo { display: none; }
+    #infoIle.ouvert .tiroir { max-height: 420px; }
+    #infoIle .liste { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+    #infoIle .liste li { display: flex; align-items: center; gap: 14px; font: 400 13.5px/1.35 Poppins, system-ui, sans-serif; color: #dbe9f0; }
+    #infoIle .liste li b { color: #fff; font-weight: 600; }
+    #infoIle .liste .pict { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center;
+      border: 1px solid rgba(255,255,255,.18); color: #8fd0ee; }
+    body.infoOuverte #bContact, body.infoOuverte #contact { filter: blur(5px); opacity: .45; pointer-events: none; transition: filter .3s, opacity .3s; }
+
+    /* ===== v6 ===== */
+    #accueil .milieu { padding-top: 34px; }
+    #choix .accroche p { text-wrap: pretty; }
+    #choix .accroche p .duree { display: block; margin-top: 6px; color: #fff; font: 600 16px/1.3 Poppins, system-ui, sans-serif; letter-spacing: -.01em; }
+    #infoIle .sousInfo { font-style: normal; font-weight: 400; color: #c3d6e0; }
+    #infoIle .bInfo { padding: 7px 13px; gap: 7px; font-size: 12px; }
+    #infoIle .bInfo .i { width: 15px; height: 15px; font-size: 9.5px; }
+
+    /* ===== v7 ===== */
+    body.menu #bContact > span:last-child { display: none; }
+    #choix .accroche p .duree { display: inline; margin: 0; font: inherit; font-weight: 600; color: #fff; letter-spacing: 0; }
+    #infoIle .sousInfo { font-weight: 600; color: #eef5f9; margin-bottom: 0; }
+    #infoIle .sousInfo::after { content: ''; display: block; height: 1px; margin: 14px 0 16px;
+      background: linear-gradient(90deg, rgba(255,255,255,.28), rgba(255,255,255,0)); }
+
+    /* ===== v8 ===== */
+    #infoIle .liste .pict { color: #fff; border: 1px solid rgba(255,255,255,.22); }
+    #infoIle .liste .pict svg { stroke-width: 1.2; }
+    #infoIle .sousInfo::after { margin-left: 0; margin-right: 0; width: 100%; background: linear-gradient(90deg, rgba(255,255,255,.35) 0%, rgba(255,255,255,0) 100%); }
+
+    /* ===== v9 ===== */
+    #infoIle .sousInfo::after { margin-left: -20px; width: calc(100% + 20px); }
+    #choix .panneau{border:1px solid rgba(14,165,233,.55);background:rgba(14,165,233,.07);box-shadow:0 0 0 4px rgba(14,165,233,.08),0 18px 40px rgba(0,0,0,.35)}
+    #choix #cLibre, #choix #cQuickLook { background: rgba(255,255,255,.055); border-color: rgba(255,255,255,.14); }
+    #choix #cLibre .ico, #choix #cQuickLook .ico { background: rgba(241,245,247,.72); }
+    #choix #cLibre > span:last-child, #choix #cQuickLook > span:last-child { color: #dbe7ee; }
+    #infoIle .tiroir { margin: 0 -20px; padding: 0 20px; }
+
+    /* ===== v10 ===== */
+    #choix .accroche p { text-align: justify; text-align-last: left; hyphens: none; text-wrap: wrap;
+      font-size: calc(min(100vw - 40px, 350px) / 25); line-height: 1.55; }
+    #choix .panneau { position: relative; border-color: rgba(14,165,233,.35); box-shadow: 0 18px 40px rgba(0,0,0,.35); }
+    #choix .panneau::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      box-shadow: 0 0 5px 2.4px #0ea5e9, 0 0 22px 2px rgba(14,165,233,.35); animation: panneauHalo 2.8s ease-in-out infinite; }
+    @keyframes panneauHalo { 0%, 100% { opacity: .22; } 50% { opacity: .85; } }
+
+    /* ===== v11 ===== */
+    #contact .role { white-space: nowrap; font-size: min(12.5px, 3.15vw); }
+    #choix .note.alerte { text-align: left; color: #ffd9a8; background: rgba(255,170,60,.10); border: 1px solid rgba(255,170,60,.35);
+      border-radius: 12px; padding: 10px 12px; font-size: 12px; line-height: 1.5; }
+    #choix .note.alerte b { color: #fff; }
+    #accueilTexte { max-width: 320px; text-align: center; line-height: 1.5; }
+</style>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "mindar-image-three": "./mindar/mindar-image-three.prod.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div id="ar"></div>
+  <div id="etat">Chargement…</div>
+  <div id="info" data-i18n="gestes">1 doigt : tourner · 2 doigts : zoom · 2 taps : recentrer</div>
+  <button id="bLegende" title="Légende">
+    <span class="rond">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5a6f80" stroke-width="1.9" stroke-linecap="round">
+        <circle cx="3.6" cy="2.6"  r="1.6" fill="#e05a47" stroke="none"/><line x1="8.2" y1="2.6"  x2="20.8" y2="2.6"/>
+        <circle cx="3.6" cy="7.3"  r="1.6" fill="#2f8f5b" stroke="none"/><line x1="8.2" y1="7.3"  x2="20.8" y2="7.3"/>
+        <circle cx="3.6" cy="12"   r="1.6" fill="#7a4fb5" stroke="none"/><line x1="8.2" y1="12"   x2="20.8" y2="12"/>
+        <circle cx="3.6" cy="16.7" r="1.6" fill="#d39b2a" stroke="none"/><line x1="8.2" y1="16.7" x2="20.8" y2="16.7"/>
+        <circle cx="3.6" cy="21.4" r="1.6" fill="#3f7fd0" stroke="none"/><line x1="8.2" y1="21.4" x2="20.8" y2="21.4"/>
+      </svg>
+    </span>
+    <span data-i18n="legende">Légende</span>
+  </button>
+  <div id="legende"></div>
+  <div id="fiche"></div>
+  <button id="bContact" class="bRond" title="Contact"><span class="rond">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><circle cx="8.5" cy="11" r="2.4"/><path d="M4.8 16.6c.7-1.8 2.1-2.7 3.7-2.7s3 .9 3.7 2.7"/><line x1="14.5" y1="9.5" x2="18.5" y2="9.5"/><line x1="14.5" y1="13" x2="18.5" y2="13"/></svg></span>
+    <span data-i18n="contactTitre">Contact</span>
+  </button>
+  <div id="accueil" class="choisir">
+    <div class="haut">
+      <a id="logoSite" href="https://www.maniculaocean.com" target="_blank" rel="noopener" aria-label="maniculaocean.com"><img src="./logo.svg" alt=""></a>
+      <button id="bLangue" class="bRond" aria-label="Langue / Language"><span class="rond"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg></span></button>
+      <div id="menuLangue">
+        <button data-lang="fr"><span class="emoji">🥐</span>Français</button>
+        <button data-lang="en"><span class="emoji">🫖</span>English</button>
+      </div>
+    </div>
+    <div class="milieu">
+      <div id="choix">
+        <div class="accroche"><h1 data-i18n="accrocheTitre"></h1><p data-i18n="accrocheTexte"></p></div>
+        <div class="panneau">
+        <div class="question" data-i18n="question">Explorer l'île en 3D</div>
+        <button class="opt" id="cCarte"><span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.3"/><path d="M5 16.4c.7-1.6 2-2.4 3.5-2.4s2.8.8 3.5 2.4"/><line x1="14.5" y1="10" x2="18.5" y2="10"/><line x1="14.5" y1="13.5" x2="18.5" y2="13.5"/></svg></span>
+          <span><span data-i18n="carte">J'ai la carte de visite</span><small data-i18n="carteSous">Visez la carte avec le téléphone</small></span></button>
+        <button class="opt" id="cLibre"><span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><circle cx="8.5" cy="11" r="2.3"/><path d="M5 16.4c.7-1.6 2-2.4 3.5-2.4s2.8.8 3.5 2.4"/><line x1="14.5" y1="10" x2="18.5" y2="10"/><line x1="14.5" y1="13.5" x2="18.5" y2="13.5"/><line x1="3.5" y1="2.5" x2="20.5" y2="21.5" stroke-width="1.3"/></svg></span>
+          <span><span data-i18n="libre">Faire depuis n'importe où</span><small data-i18n="libreSous">L'île se pose sur une table ou le sol</small></span></button>
+        <!-- iPhone : visionneuse 3D d'Apple (AR Quick Look). Le 1er enfant d'un lien rel="ar" doit être une image. -->
+        <a class="opt" id="cQuickLook" rel="ar" style="display:none" href="./ile_zone3.usdz"><img class="ico" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23062033' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2.5' y='5' width='19' height='14' rx='2.5'/%3E%3Ccircle cx='8.5' cy='11' r='2.3'/%3E%3Cpath d='M5 16.4c.7-1.6 2-2.4 3.5-2.4s2.8.8 3.5 2.4'/%3E%3Cline x1='14.5' y1='10' x2='18.5' y2='10'/%3E%3Cline x1='14.5' y1='13.5' x2='18.5' y2='13.5'/%3E%3Cline x1='3.5' y1='2.5' x2='20.5' y2='21.5' stroke-width='1.3'/%3E%3C/svg%3E">
+          <span><span data-i18n="libre">Faire depuis n'importe où</span><small data-i18n="libreSous">Vue 3D Apple : l'île seule, sans organismes</small></span></a>
+        <div class="note" id="choixNote"></div>
+        </div>
+      </div>
+      <div id="barre"><i></i></div><div id="accueilTexte" data-i18n="chargement">Chargement…</div>
+      <button class="retour" onclick="location.reload()" data-i18n="retour">Retour</button>
+    </div>
+    <div id="voileInfo"></div><div id="infoIle"></div>
+  </div>
+  <button id="bOptions"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"/></svg><span data-i18n="options">Revenir aux options</span></button>
+  <button id="bReplacer"><span class="rond"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/><circle cx="12" cy="12" r="3"/></svg></span><span data-i18n="deplacer">Déplacer l'île</span></button>
+  <div id="contact"></div>
+  <div id="reglages">
+    <span class="pastille"></span>
+    <button data-mode="ile" class="actif">
+      <svg width="20" height="16" viewBox="0 0 24 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13 L8 5.5 L11.5 9.5 L14.5 6.5 L22 13"/><path d="M1 16.6 C5 15 8 15 12 16.6 C16 18.2 19 18.2 23 16.6"/></svg>
+      <span data-i18n="modeIle">Relief seul</span>
+    </button>
+    <button data-mode="det">
+      <svg width="16" height="16" viewBox="0 0 16 16"><circle cx="8" cy="3.6" r="3" fill="#ff4444"/><circle cx="3.8" cy="11.6" r="3" fill="#1E90FF"/><circle cx="12.2" cy="11.6" r="3" fill="#FFD700"/></svg>
+      <span data-i18n="modeDet">Détections IA</span>
+    </button>
+    <button data-mode="imm">
+      <svg width="24" height="15" viewBox="0 0 32 20"><path fill="currentColor" fill-rule="evenodd" d="M2.2 10.4C5.6 5.4 10.4 3 15.6 3c4.4 0 7.8 1.9 10.1 4.6L30.4 4c.5-.4 1.2 0 1.1.6l-1 5.4 1 5.4c.1.6-.6 1-1.1.6l-4.7-3.6C23.4 15.1 20 17 15.6 17c-5.2 0-10-2.4-13.4-6.6zM9.3 8.1a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z"/><path fill="currentColor" d="M12.5 3.6C14 1.4 16.6.6 19.2 1.4l-1.6 2.6z"/></svg>
+      <span data-i18n="modeImm">Immersion</span>
+    </button>
+  </div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+// MindAR n'est chargé que pour le mode « carte de visite » (import plus bas)
+
+// ---------- Réglages (modifiables aussi dans l'URL : ?axe=1&relief=2&taille=0.9) ----------
+const p = new URLSearchParams(location.search);
+
+
+// ---------- Langue (français / anglais) ----------
+// Choix : ?lang=fr|en, sinon le choix fait pendant cette visite, sinon le français (par défaut).
+const TEXTES = {
+  fr: {
+    question: "Explorez l'île en 3D",
+    carte: "J'ai la carte de visite", carteSous: 'Visez la carte avec le téléphone',
+    libre: "Je n'ai pas la carte de visite", libreSous: "Faire depuis n'importe où",
+    quickLookSous: "Sur iPhone, sans la carte, vous verrez l'île en 3D <b>sans les espèces</b> détectées. Touchez à nouveau le bouton pour l'ouvrir.",
+    noteLibre: "« N'importe où » : disponible sur iPhone et sur Android avec Chrome (si le téléphone gère la réalité augmentée).",
+    chargement: 'Chargement…', demarrageCamera: 'Démarrage de la caméra…', demarrageRA: 'Démarrage de la réalité augmentée…',
+    retour: 'Retour', options: 'Revenir aux options', deplacer: "Déplacer l'île",
+    erreurCamera: 'Caméra indisponible (autorisation refusée ou page non HTTPS)',
+    cameraBloquee: 'La caméra a été refusée pour ce site. Le navigateur ne la redemandera pas tout seul : <b>Android / Chrome</b> : touchez l’icône à gauche de l’adresse › Autorisations › Caméra › Autoriser. <b>iPhone / Safari</b> : touchez « aA » › Réglages du site web › Caméra › Autoriser. Puis rechargez la page.',
+    erreurRA: "Réalité augmentée impossible sur ce téléphone (il faut « Services Google Play pour la RA » et l'autorisation caméra)",
+    viseCarte: 'Visez la carte de visite', poser: "Touchez l'écran pour poser l'île", balayer: 'Balayez lentement le sol ou une table avec le téléphone',
+    gestes: '1 doigt : tourner · 2 doigts : zoom · 2 taps : recentrer',
+    modeIle: 'Relief seul', modeDet: 'Détections IA', modeImm: 'Immersion',
+    legende: 'Légende', legendeTitre: 'Espèces détectées par IA', affichees: n => `(${n} affichées)`,
+    role: 'PhD et ingénieur en écophysiologie marine', publications: 'Publications scientifiques', ajouter: 'Ajouter à mes contacts',
+    meContacter: 'Me contacter',
+    infoTitre: 'Information', contactTitre: 'Contact', langueTitre: 'Langue',
+    accrocheTitre: 'Mesurer la biodiversité<br>sous-marine, <b>autrement.</b>',
+    accrocheTexte: 'Dans l’exemple que vous allez voir, nous avons scanné puis identifié chaque organisme marin autour de l’île, <span class="duree">en seulement 8 minutes.</span>',
+    lieu: 'Petite île des Fourmigues, Hyères (France)',
+    infoSous: 'La méthode d’analyse de la biodiversité marine la plus rapide, complète et accessible du monde.',
+    bulles: ['Exemple réalisé à la petite île des Fourmigues, Hyères (France)', 'Technologie protégée par un brevet', '<b>Plus de 2 000</b> organismes détectés en 8 minutes',
+             '<b>2 500 m²</b> cartographiés en 8 minutes', 'Poissons et habitats détectés <b>simultanément</b> par IA'],
+  },
+  en: {
+    question: 'Explore the island in 3D',
+    carte: 'I have the business card', carteSous: 'Point your phone at the card',
+    libre: "I don't have the business card", libreSous: 'View it anywhere',
+    quickLookSous: 'On iPhone, without the card, you will see the island in 3D <b>without the detected species</b>. Tap the button again to open it.',
+    noteLibre: '“Anywhere” works on iPhone, and on Android with Chrome (if the phone supports augmented reality).',
+    chargement: 'Loading…', demarrageCamera: 'Starting the camera…', demarrageRA: 'Starting augmented reality…',
+    retour: 'Back', options: 'Back to options', deplacer: 'Move island',
+    erreurCamera: 'Camera unavailable (permission denied or page not served over HTTPS)',
+    cameraBloquee: 'Camera access was denied for this site. The browser will not ask again on its own: <b>Android / Chrome</b>: tap the icon left of the address › Permissions › Camera › Allow. <b>iPhone / Safari</b>: tap “aA” › Website Settings › Camera › Allow. Then reload the page.',
+    erreurRA: 'Augmented reality is not available on this phone (it needs “Google Play Services for AR” and camera permission)',
+    viseCarte: 'Point at the business card', poser: 'Tap the screen to place the island', balayer: 'Slowly sweep your phone over the floor or a table',
+    gestes: '1 finger: rotate · 2 fingers: zoom · double-tap: reset',
+    modeIle: 'Terrain only', modeDet: 'AI detections', modeImm: 'Immersive',
+    legende: 'Legend', legendeTitre: 'Species detected by AI', affichees: n => `(${n} shown)`,
+    role: 'PhD, marine ecophysiology engineer', publications: 'Scientific publications', ajouter: 'Add to contacts',
+    meContacter: 'Contact me',
+    infoTitre: 'Information', contactTitre: 'Contact', langueTitre: 'Language',
+    accrocheTitre: 'Measuring underwater<br>biodiversity, <b>differently.</b>',
+    accrocheTexte: 'In the example you are about to see, we scanned and then identified every marine organism around the island, <span class="duree">in just 8 minutes.</span>',
+    lieu: 'Small island of Les Fourmigues, Hyères (France)',
+    infoSous: 'The fastest, most complete and most accessible marine biodiversity analysis method in the world.',
+    bulles: ['Example recorded at the small island of Les Fourmigues, Hyères (France)', 'Patented technology', '<b>Over 2,000</b> organisms detected in 8 minutes',
+             '<b>2,500 m²</b> mapped in 8 minutes', 'Fish and habitats detected <b>simultaneously</b> by AI'],
+  },
+};
+// noms anglais des espèces (les noms français viennent de organismes_zone3.json)
+const NOMS_EN = {
+  Chromis: 'Damselfish', Oursin: 'Purple sea urchin', Codium_boule: 'Ball codium', Gorgogne: 'White gorgonian',
+  Girelle: 'Mediterranean rainbow wrasse', Girelle_paon: 'Ornate wrasse', Posidonie: 'Neptune grass', Sar: 'Seabream',
+  Labre: 'Painted comber', Anemone: 'Snakelocks anemone',
+};
+let langue = (() => {
+  if (TEXTES[p.get('lang')]) return p.get('lang');
+  try { const m = sessionStorage.getItem('langueAR'); if (TEXTES[m]) return m; } catch (e) {}
+  return 'fr';                                  // français par défaut
+})();
+const t = cle => TEXTES[langue][cle];
+const nomEspece = (id, sp) => (langue === 'en' && NOMS_EN[id]) || (sp && sp.nom) || id;
+const nombre = (v, d) => v.toFixed(d).replace('.', langue === 'fr' ? ',' : '.');
+const MODELE   = p.get('modele') || './zone3_3d.glb';
+// Orientations testées par le bouton « Axe » : rotation appliquée au modèle avant de le poser.
+// Sur la carte, X = largeur, Y = hauteur de la carte, Z = vers le haut (sortie de la carte).
+const AXES = [
+  { nom: 'Y-haut (glTF standard)', rot: [Math.PI / 2, 0, 0] },
+  { nom: 'Z-haut',                 rot: [0, 0, 0] },
+  { nom: 'Y-bas',                  rot: [-Math.PI / 2, 0, 0] },
+  { nom: 'Z-bas',                  rot: [Math.PI, 0, 0] },
+];
+let axe    = +(p.get('axe') ?? 1) % AXES.length;   // 1 = Z-haut : bonne orientation pour zone3_3d.glb
+let relief = +(p.get('relief') ?? 1);    // exagération verticale
+let taille = +(p.get('taille') ?? 1.2);  // taille au démarrage (1 = le modèle remplit la carte) — 1,5 × 0,8
+// Zoom limité : au plus 2× la taille de départ (sinon on sort vite de la carte), au moins la moitié
+const TAILLE_MIN = taille * 0.5, TAILLE_MAX = taille * 2;
+
+const etat = document.getElementById('etat');
+// Style de la consigne (« Visez la carte »…) : 3 propositions à comparer, ?consigne=a (texte), b (viseur), c (bandeau bas)
+document.body.classList.add('consigne-' + (['a', 'b', 'c'].includes(p.get('consigne')) ? p.get('consigne') : 'b'));
+const info = document.getElementById('info');
+// Message affiché tant que l'île n'est pas visible
+let reticuleVu = false;
+const texteAttente = () => !LIBRE ? t('viseCarte') : t(reticuleVu ? 'poser' : 'balayer');
+
+// ---------- Caméra en meilleure résolution ----------
+// MindAR demande la caméra sans préciser de résolution : beaucoup de téléphones renvoient alors 640×480.
+// On ajoute une demande « idéale » en 1280×720 (désactivable avec ?hd=0).
+if (p.get('hd') !== '0' && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+  const gumOriginal = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+  navigator.mediaDevices.getUserMedia = (c) => {
+    if (c && c.video && typeof c.video === 'object') {
+      c.video.width = { ideal: 1280 };
+      c.video.height = { ideal: 720 };
+    }
+    return gumOriginal(c);
+  };
+}
+
+// ---------- Barre de chargement (écran d'accueil) ----------
+// Étapes réelles : page lue, modèle chargé, organismes, caméra choisie… puis le démarrage du suivi,
+// l'étape la plus longue (≈ 3 s) dont MindAR ne donne pas l'avancement : la barre avance alors doucement
+// vers 95 % et se complète quand le suivi est prêt.
+let avance = 0, rampe = null;
+function progression(v) { avance = Math.max(avance, v); const b = document.querySelector('#barre i'); if (b) b.style.width = avance + '%'; }
+progression(8);
+
+// ---------- Préchargement pendant l'écran de choix ----------
+// Le modèle, le dessus de l'île et les organismes servent dans les deux modes : on les télécharge tout de suite.
+const charger = (url, type) => fetch(url).then(r => { if (!r.ok) throw new Error(url + ' : ' + r.status); return r[type](); });
+const precharge = {
+  modele: charger(MODELE, 'arrayBuffer'),
+  dessus: charger('./dessus.glb', 'arrayBuffer'),
+  organismes: charger('./organismes_zone3.json', 'json'),
+};
+Object.values(precharge).forEach(pr => pr.catch(() => {}));   // erreurs traitées à l'utilisation
+
+// ---------- Contact (bouton en haut à droite) ----------
+const CONTACT = {
+  nom: 'Jules Schligler',
+  email: 'jules@maniculaocean.com', site: 'https://www.maniculaocean.com',
+  scholar: 'https://scholar.google.com/citations?user=Bdeye5kAAAAJ&hl=en',
+};
+const contactEl = document.getElementById('contact'), bContact = document.getElementById('bContact');
+const ico = d => `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ligneContact = (href, icone, texte, extra = '') =>
+  `<a href="${href}" ${extra}>${ico(icone)}<span class="txt">${texte}</span><span class="chev">›</span></a>`;
+const construireContact = () => contactEl.innerHTML =
+  `<div class="entete"><img src="./photo.jpg" alt="Jules Schligler"><div><div class="nom">${CONTACT.nom}</div><div class="role">${t('role')}</div></div></div>` +
+  ligneContact('mailto:' + CONTACT.email, '<rect x="3" y="5" width="18" height="14" rx="2"/><polyline points="3,7 12,13 21,7"/>', CONTACT.email) +
+  // Google Scholar : toque en contour (même style que les autres icônes) + adresse, comme les autres lignes
+  ligneContact(CONTACT.scholar, '<path d="M2 9.6 12 2.4l10 7.2-4.3 3.1"/><path d="M6.3 12.7 2 9.6"/><circle cx="12" cy="16.4" r="5.2"/>',
+               `<span class="titre">${t('publications')}</span><span class="source">Google Scholar</span>`, 'target="_blank" rel="noopener"') +
+  ligneContact(CONTACT.site, '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.6 2.6 3.9 5.6 3.9 9s-1.3 6.4-3.9 9c-2.6-2.6-3.9-5.6-3.9-9S9.4 5.6 12 3z"/>',
+               CONTACT.site.replace(/^https?:\/\/(www\.)?/, ''), 'target="_blank" rel="noopener"') +
+  // action différente des liens : pilule centrée
+  `<a class="ajouter" href="./contact.vcf" download="Jules_Schligler.vcf">${ico('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="16" y1="11" x2="22" y2="11"/>')}${t('ajouter')}</a>`;
+// toucher n'importe où ailleurs (caméra, île, boutons…) ferme le panneau contact
+addEventListener('pointerdown', e => {
+  if (contactEl.style.display === 'block' && !e.target.closest('#contact, #bContact')) {
+    contactEl.style.display = 'none'; bContact.classList.remove('actif');
+  }
+}, true);
+bContact.onclick = () => {
+  const ouvert = contactEl.style.display !== 'block';
+  contactEl.style.display = ouvert ? 'block' : 'none';
+  bContact.classList.toggle('actif', ouvert);
+};
+
+
+// ---------- Bloc « Information » : 5 cercles fins (rapidité, précision, brevet, surface, poissons + habitats) ----------
+document.body.classList.add('retour-' + (p.get('retour') === 'a' ? 'a' : 'b'));
+document.body.classList.add('menu');                       // style minimal des boutons Langue / Contact sur l'écran de choix
+const infoEl = document.getElementById('infoIle');
+const icone = (d, vb = 24) => `<svg width="19" height="19" viewBox="0 0 ${vb} 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+const ICONES_INFO = [
+  icone('<path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/>'),                                    // lieu
+  icone('<path d="M12 2.5 5 5.3v5.9c0 4.4 3 8.1 7 9.8 4-1.7 7-5.4 7-9.8V5.3z"/><polyline points="9 12 11.2 14.2 15.2 9.8"/>'),          // bouclier
+  icone('<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/><path d="M12 1.5v4M12 18.5v4M1.5 12h4M18.5 12h4"/>'),          // cible
+  icone('<path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20z"/><path d="M9 4v13.5M15 6.5V20"/>'),                                     // carte (surface)
+  icone('<path d="M2 12c3.5-4.5 7.5-6 11.5-6 3.3 0 5.7 1.4 7.3 3.3L24.5 6l-.9 6 .9 6-3.7-3.3C19.2 16.6 16.8 18 13.5 18 9.5 18 5.5 16.5 2 12z"/><circle cx="8" cy="11" r=".9" fill="currentColor"/>', 26), // poisson
+];
+let infoActive = -1;
+let infoOuvert = false;
+function basculerInfo(v) {
+  infoOuvert = v === undefined ? !infoOuvert : v;
+  infoEl.classList.toggle('ouvert', infoOuvert); document.body.classList.toggle('infoOuverte', infoOuvert);
+  const bt = infoEl.querySelector('.bInfo'); if (bt) bt.setAttribute('aria-expanded', infoOuvert);
+}
+document.getElementById('voileInfo').onclick = () => basculerInfo(false);
+function construireInfo() {
+  const B = t('bulles');
+  infoEl.innerHTML = `<button class="bInfo" aria-expanded="${infoOuvert}"><span class="i">i</span><span>${t('infoTitre')}</span>` +
+    `<svg class="fl" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 15 12 9 18 15"/></svg></button>` +
+    `<div class="tiroir"><div class="sousInfo">${t('infoSous')}</div><ul class="liste">` +
+    B.map((txt, i) => `<li><span class="pict">${ICONES_INFO[i]}</span><span>${txt}</span></li>`).join('') + `</ul></div>`;
+  infoEl.querySelector('.bInfo').onclick = () => basculerInfo();
+  basculerInfo(infoOuvert);
+}
+function placerLegendeInfo() {}
+addEventListener('resize', placerLegendeInfo);
+
+// ---------- Application de la langue (écran de choix, boutons, contact, lien iPhone) ----------
+function appliquerLangue() {
+  document.documentElement.lang = langue;
+  document.querySelectorAll('[data-i18n]').forEach(el => { el.innerHTML = t(el.dataset.i18n); });
+  document.querySelectorAll('#menuLangue button').forEach(b => b.classList.toggle('actif', b.dataset.lang === langue));
+  // bandeau de la visionneuse Apple : nom, titre et bouton dans la langue choisie
+  const q = new URLSearchParams({ checkoutTitle: CONTACT.nom, checkoutSubtitle: t('role'), callToAction: t('meContacter') });
+  document.getElementById('cQuickLook').href = './ile_zone3.usdz#' + q.toString().replace(/\+/g, '%20');
+  construireContact();
+  construireInfo();
+  const note = document.getElementById('choixNote'); if (note.textContent) note.textContent = t('noteLibre');
+}
+const menuLangue = document.getElementById('menuLangue');
+document.getElementById('bLangue').onclick = e => { e.stopPropagation(); menuLangue.classList.toggle('ouvert'); };
+menuLangue.querySelectorAll('button').forEach(b => b.onclick = () => {
+  langue = b.dataset.lang;
+  try { sessionStorage.setItem('langueAR', langue); } catch (e) {}
+  menuLangue.classList.remove('ouvert');
+  appliquerLangue();
+});
+addEventListener('pointerdown', e => { if (!e.target.closest('#menuLangue, #bLangue')) menuLangue.classList.remove('ouvert'); });
+appliquerLangue();
+// Retour à l'écran de choix (recharge la page sans ?mode=carte)
+document.getElementById('bOptions').onclick = () => {
+  const u = new URL(location.href); u.searchParams.delete('mode'); location.href = u.toString();
+};
+
+// ---------- Écran de choix : carte de visite ou n'importe où ----------
+// Carte : suivi d'image MindAR (tous téléphones). N'importe où : WebXR (Android + Chrome, interface complète)
+// ou, sur iPhone (pas de WebXR dans Safari), la visionneuse 3D d'Apple (AR Quick Look) avec le fichier USDZ.
+// ?mode=carte saute le choix (utile pour un QR code imprimé sur la carte).
+const accueilEl = document.getElementById('accueil'), choixNote = document.getElementById('choixNote');
+const bLibre = document.getElementById('cLibre'), lienQuickLook = document.getElementById('cQuickLook');
+const quickLook = (() => { try { return document.createElement('a').relList.supports('ar'); } catch (e) { return false; } })();
+let xrPossible = false;
+if (navigator.xr && navigator.xr.isSessionSupported) {
+  bLibre.disabled = true;
+  navigator.xr.isSessionSupported('immersive-ar').then(ok => {
+    xrPossible = ok; bLibre.disabled = false;
+    if (!ok) majOptionLibre();
+  }).catch(() => majOptionLibre());
+} else majOptionLibre();
+function majOptionLibre() {
+  if (xrPossible) return;
+  if (quickLook) { bLibre.style.display = 'none'; lienQuickLook.style.display = 'flex'; return; }
+  bLibre.disabled = true;
+  choixNote.textContent = t('noteLibre');
+}
+// iPhone : 1er toucher = avertissement (pas d'espèces sans la carte), 2e toucher = ouverture de la vue 3D Apple
+let qlPrevenu = false;
+lienQuickLook.addEventListener('click', e => {
+  if (qlPrevenu) return;
+  e.preventDefault(); qlPrevenu = true;
+  choixNote.innerHTML = t('quickLookSous'); choixNote.classList.add('alerte');
+});
+// Bouton du bandeau de la visionneuse Apple (« Me contacter ») : on ouvre la fiche contact au retour sur la page
+lienQuickLook.addEventListener('message', e => {
+  if (e.data === '_apple_ar_quicklook_button_tapped') {
+    const c = document.getElementById('contact');
+    c.style.display = 'block'; document.getElementById('bContact').classList.add('actif');
+  }
+}, false);
+let etatCamera = 'prompt';
+try { navigator.permissions.query({ name: 'camera' }).then(st => { etatCamera = st.state; st.onchange = () => { etatCamera = st.state; if (st.state !== 'denied') choixNote.innerHTML = ''; }; }).catch(() => {}); } catch (e) {}
+function cameraRefusee() {
+  if (etatCamera !== 'denied') return false;
+  choixNote.innerHTML = t('cameraBloquee'); choixNote.classList.add('alerte'); return true;
+}
+const choix = p.get('mode') === 'carte' ? { mode: 'carte' } : await new Promise(resolve => {
+  document.getElementById('cCarte').onclick = () => { if (!cameraRefusee()) resolve({ mode: 'carte' }); };
+  // la session de réalité augmentée doit être demandée DANS le toucher (exigence des navigateurs)
+  bLibre.onclick = () => {
+    if (!xrPossible || cameraRefusee()) return;
+    const session = navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } });
+    resolve({ mode: 'libre', session });
+  };
+});
+const LIBRE = choix.mode === 'libre';
+document.body.classList.toggle('libre', LIBRE);
+accueilEl.classList.remove('choisir');
+document.body.classList.remove('menu');
+
+// ---------- Choix de la caméra ----------
+// Beaucoup de téléphones donnent par défaut l'ULTRA GRAND-ANGLE (« ×0,5 ») : image déformée sur les bords et
+// angle de vue très différent de ce que suppose le calcul de position → île de travers, suivi fragile.
+// On choisit la caméra arrière PRINCIPALE (×1). Le bouton 📷 permet de passer à la suivante (mémorisé).
+let camerasArriere = [], indexCamera = 0;
+async function choisirCamera() {
+  try {
+    const flux = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    flux.getTracks().forEach(t => t.stop());                      // juste pour obtenir l'autorisation et les noms
+    const toutes = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+    const arriere = toutes.filter(c => /back|rear|arri|environment/i.test(c.label));
+    camerasArriere = arriere.length ? arriere : toutes;
+    const numero = c => { const m = c.label.match(/camera2?\s*(\d+)/i); return m ? +m[1] : 99; };
+    const secondaire = /ultra|wide|grand|dual|triple|tele|macro|depth/i;  // ultra grand-angle, téléobjectif, caméras virtuelles…
+    camerasArriere.sort((a, b) => (secondaire.test(a.label) - secondaire.test(b.label)) || (numero(a) - numero(b)));
+    // ?cam=N force la caméra n° N de la liste ; sinon le choix fait sur ce téléphone avec l'ancien bouton 📷 ;
+    // sinon la caméra principale (×1) d'après les noms
+    let memo = null;
+    try { memo = localStorage.getItem('cameraAR'); } catch (e) {}
+    const i = memo ? camerasArriere.findIndex(c => c.deviceId === memo) : -1;
+    indexCamera = p.has('cam') ? Math.min(+p.get('cam'), camerasArriere.length - 1) : (i >= 0 ? i : 0);
+    return camerasArriere[indexCamera] ? camerasArriere[indexCamera].deviceId : null;
+  } catch (e) { console.warn('choix caméra', e); return null; }
+}
+const idCamera = (LIBRE || p.get('cam') === 'auto') ? null : await choisirCamera();
+progression(avance + 10);
+
+// Angle de vue supposé, mesuré sur le PETIT côté de l'image (copie de MindAR corrigée : ./mindar/).
+// 45° ≈ caméra principale d'un téléphone en 16:9. Réglable : ?fov=50
+globalThis.MINDAR_FOV_COURT = +(p.get('fov') ?? 45);
+
+// ---------- MindAR ----------
+// MindAR lisse les 16 nombres de sa matrice UN PAR UN : avec un lissage fort, le mélange de deux positions
+// n'est plus une vraie rotation et l'île se déforme (relief qui grandit ou s'écrase pendant plusieurs secondes).
+// On laisse donc MindAR presque sans lissage et on lisse nous-mêmes position et rotation séparément (plus bas).
+let mindar = null, renderer, scene, camera, ancre;
+if (!LIBRE) {
+  const { MindARThree } = await import('mindar-image-three');
+  mindar = new MindARThree({
+    container: document.getElementById('ar'),
+    imageTargetSrc: './targets.mind',
+    uiScanning: 'no', uiLoading: 'no',
+    environmentDeviceId: idCamera || undefined,
+    // pertes courtes (flou de bougé, reflet) : l'île reste à sa dernière position au lieu de disparaître
+    missTolerance: +(p.get('miss') ?? 15),
+    filterMinCF: p.has('mfc') ? +p.get('mfc') : null,
+    filterBeta: p.has('mbeta') ? +p.get('mbeta') : null,
+  });
+  ({ renderer, scene, camera } = mindar);
+  ancre = mindar.addAnchor(0);
+} else {
+  // Mode « n'importe où » : notre propre rendu three.js, piloté par WebXR (pas de MindAR, pas de suivi d'image).
+  // Le canevas n'est pas ajouté à la page : en réalité augmentée, l'image passe par la session WebXR.
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(devicePixelRatio);
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.xr.enabled = true;
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.01, 50);
+  ancre = { group: { visible: false, matrix: new THREE.Matrix4() } };   // pas de carte à suivre
+}
+// Caméra et rectangle d'écran à utiliser pour projeter/viser : en WebXR, la caméra du téléphone fournie par la session
+const camVue = () => renderer.xr.isPresenting ? (renderer.xr.getCamera().cameras[0] || renderer.xr.getCamera()) : camera;
+const rectVue = () => renderer.xr.isPresenting ? { left: 0, top: 0, width: innerWidth, height: innerHeight } : renderer.domElement.getBoundingClientRect();
+
+// Repère de la carte : largeur = 1, hauteur = 0.647 (format 85×55 mm), centrée en (0,0)
+const CARTE_L = 1, CARTE_H = 55 / 85;
+
+// Lumière douce (les textures de photogrammétrie ont déjà l'éclairage intégré)
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.2));
+
+// Hiérarchie : suivi (pose lissée de la carte) > decal (déplacement dû au zoom) > tour (rotation) > pose (centrage/échelle) > orient > modèle
+// Tous les gestes travaillent dans le plan de la carte (repère de « suivi », z = 0).
+const suivi = new THREE.Group();
+suivi.matrixAutoUpdate = false; suivi.visible = false;
+scene.add(suivi);
+const decal = new THREE.Group();
+const tour = new THREE.Group();
+const pose = new THREE.Group();
+const orient = new THREE.Group();
+pose.add(orient);
+tour.add(pose);
+decal.add(tour);
+suivi.add(decal);
+
+// ---------- Lissage RIGIDE du suivi ----------
+// Position et rotation sont lissées séparément (rotation par interpolation sphérique) :
+// le résultat est toujours une vraie position + rotation, l'île ne peut pas se déformer.
+// Lissage « à bande » : un PETIT écart entre la mesure et l'île affichée est du tremblement → lissage fort ;
+// un GRAND écart est un vrai mouvement → l'île rattrape vite. Entre les deux, transition douce.
+// Réglable dans l'URL : ?a0=4&a1=14 (degrés) &d0=0.02&d1=0.08 (largeur de carte) &lent=0.08&rapide=8 (Hz)
+const DEG = Math.PI / 180;
+const BANDE = {
+  a0: +(p.get('a0') ?? 4) * DEG,  a1: +(p.get('a1') ?? 14) * DEG,     // rotation : en dessous de a0 = tremblement
+  d0: +(p.get('d0') ?? 0.02),     d1: +(p.get('d1') ?? 0.08),          // position : idem, en largeur de carte
+  lent: +(p.get('lent') ?? 0.08), rapide: +(p.get('rapide') ?? 8),     // fréquences de coupure (Hz)
+};
+const SAUT_CARTE = 0.6, SAUT_ANGLE = 0.6;   // au-delà (largeur de carte / radians) : on recale directement
+// Rejet des fausses mesures : un écart de plus de 15° ou 15 % de carte d'UNE mesure à la suivante est suspect
+// et n'est accepté qu'après 3 mesures cohérentes d'affilée. Réglable : ?sautA=15&sautP=0.15&confirm=3
+const SAUT_MESURE_A = +(p.get('sautA') ?? 15) * DEG, SAUT_MESURE_P = +(p.get('sautP') ?? 0.15);
+const CONFIRMATIONS = +(p.get('confirm') ?? 3);
+let filtre = null, cible = null, candidat = null, derniereBrute = null, nbRejets = 0;
+const _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3();
+const coefLisse = (fc, dt) => { const r = 2 * Math.PI * fc * dt; return r / (r + 1); };
+function coefBande(ecart, e0, e1, dt) {
+  let t = Math.min(1, Math.max(0, (ecart - e0) / (e1 - e0)));
+  t = t * t * (3 - 2 * t);
+  return coefLisse(BANDE.lent + (BANDE.rapide - BANDE.lent) * t, dt);
+}
+// Diagnostic (?debug=1) : cadence réelle du suivi et de l'affichage
+const DEBUG = p.get('debug') === '1';
+let nbMesures = 0, nbImages = 0, tDebug = performance.now(), derniereMesure = null;
+function lisserSuivi(dt) {
+  if (LIBRE) return;                                   // mode n'importe où : l'île est posée, rien à lisser
+  if (DEBUG) {
+    nbImages++;
+    const e = ancre.group.matrix.elements;
+    if (!derniereMesure || e[12] !== derniereMesure[0] || e[13] !== derniereMesure[1] || e[14] !== derniereMesure[2]) { nbMesures++; derniereMesure = [e[12], e[13], e[14]]; }
+    const t = performance.now();
+    if (t - tDebug > 1000) {
+      const v = document.querySelector('#ar video');
+      etat.style.display = '';
+      etat.textContent = `suivi ${Math.round(nbMesures * 1000 / (t - tDebug))} mesures/s · rejets ${nbRejets} · affichage ${Math.round(nbImages * 1000 / (t - tDebug))} img/s · caméra ${v ? v.videoWidth + '×' + v.videoHeight : '?'} · ` +
+        camerasArriere.map((c, k) => (k === indexCamera ? '▶' : '') + k + ' = ' + c.label).join(' | ');
+      nbMesures = 0; nbImages = 0; nbRejets = 0; tDebug = t;
+    }
+  }
+  if (!ancre.group.visible) { suivi.visible = false; filtre = null; cible = null; candidat = null; derniereBrute = null; return; }
+  // 1) Nouvelle mesure de MindAR ? On la filtre : un saut isolé (fausse mesure, fréquente vue de biais)
+  //    n'est accepté que s'il se confirme sur CONFIRMATIONS mesures d'affilée.
+  const e = ancre.group.matrix.elements;
+  const nouvelle = !derniereBrute || e.some((v, i) => v !== derniereBrute[i]);
+  if (nouvelle) {
+    derniereBrute = e.slice();
+    ancre.group.matrix.decompose(_p, _q, _s);
+    if (!cible) {
+      cible = { p: _p.clone(), q: _q.clone(), s: _s.x || 1 };
+    } else {
+      if (cible.q.dot(_q) < 0) _q.set(-_q.x, -_q.y, -_q.z, -_q.w);
+      const L = cible.s;
+      const saut = cible.p.distanceTo(_p) / L > SAUT_MESURE_P || cible.q.angleTo(_q) > SAUT_MESURE_A;
+      if (!saut) {
+        cible.p.copy(_p); cible.q.copy(_q); cible.s = _s.x || L; candidat = null;
+      } else {
+        // saut : on attend qu'il se confirme (mesures successives cohérentes entre elles)
+        const coherent = candidat && candidat.p.distanceTo(_p) / L < SAUT_MESURE_P && candidat.q.angleTo(_q) < SAUT_MESURE_A;
+        candidat = coherent ? { p: _p.clone(), q: _q.clone(), s: _s.x || L, n: candidat.n + 1 }
+                            : { p: _p.clone(), q: _q.clone(), s: _s.x || L, n: 1 };
+        if (DEBUG) nbRejets++;
+        if (candidat.n >= CONFIRMATIONS) { cible = candidat; candidat = null; }
+      }
+    }
+  }
+  if (!cible) return;
+  // 2) L'île affichée rejoint la dernière mesure acceptée, avec le lissage « à bande »
+  const L = cible.s;
+  const ecartP = filtre ? filtre.p.distanceTo(cible.p) / L : 0, ecartA = filtre ? filtre.q.angleTo(cible.q) : 0;
+  if (!filtre || ecartP > SAUT_CARTE || ecartA > SAUT_ANGLE) {
+    filtre = { p: cible.p.clone(), q: cible.q.clone(), s: L };
+  } else if (dt > 0) {
+    const ap = coefBande(ecartP, BANDE.d0, BANDE.d1, dt);
+    const aq = coefBande(ecartA, BANDE.a0, BANDE.a1, dt);
+    filtre.p.lerp(cible.p, ap); filtre.q.slerp(cible.q, aq); filtre.s += ap * (L - filtre.s);
+  }
+  _s.setScalar(filtre.s);
+  suivi.matrix.compose(filtre.p, filtre.q, _s);
+  suivi.matrixWorldNeedsUpdate = true;
+  suivi.visible = true;
+}
+
+let modele = null;
+let anim = 0;           // 0 → 1 : l'île « sort » de la carte
+let visible = false;
+
+function ajuster() {
+  if (!modele) return;
+  orient.rotation.set(...AXES[axe].rot);
+  pose.position.set(0, 0, 0);
+  pose.scale.set(1, 1, 1);
+  pose.updateMatrixWorld(true);
+  // Emprise du modèle dans le repère de « pose », calculée sur les sommets en ignorant
+  // les 1 % extrêmes en X et Y (évite qu'un fragment isolé de photogrammétrie rétrécisse tout).
+  const inv = new THREE.Matrix4().copy(pose.matrixWorld).invert();
+  const xs = [], ys = []; let minZ = Infinity;
+  const v = new THREE.Vector3();
+  modele.traverse(o => {
+    if (!o.isMesh) return;
+    const pos = o.geometry.attributes.position;
+    const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+    const pas = Math.max(1, Math.floor(pos.count / 50000));   // échantillonnage si très gros
+    for (let i = 0; i < pos.count; i += pas) {
+      v.fromBufferAttribute(pos, i).applyMatrix4(m);
+      xs.push(v.x); ys.push(v.y); if (v.z < minZ) minZ = v.z;
+    }
+  });
+  const q = (a, f) => a[Math.min(a.length - 1, Math.max(0, Math.round(f * (a.length - 1))))];
+  xs.sort((a, b) => a - b); ys.sort((a, b) => a - b);
+  const x0 = q(xs, 0.01), x1 = q(xs, 0.99), y0 = q(ys, 0.01), y1 = q(ys, 0.99);
+  const centre = new THREE.Vector3((x0 + x1) / 2, (y0 + y1) / 2, 0);
+  const s0 = Math.min(CARTE_L / (x1 - x0), CARTE_H / (y1 - y0));   // échelle « remplit la carte »
+  pose.userData = { s0, centre, minZ };
+  majInfo();
+}
+
+function majInfo() { /* plus d'affichage des réglages : seule l'aide « 1 doigt / 2 doigts » reste */ }
+
+function appliquerPose() {
+  const u = pose.userData;
+  if (!u.s0) return;
+  const s = u.s0 * taille;
+  const t = INTRO === 'scan' ? 1 : 1 - Math.pow(1 - anim, 3);          // easing (pas de « pop » avec le scanner)
+  const sz = s * relief * Math.max(t, 0.001);
+  pose.scale.set(s, s, sz);
+  pose.position.set(-u.centre.x * s, -u.centre.y * s, -u.minZ * sz + 0.002);
+}
+
+// ---------- Dessus de l'île (colline, arbres, nuage, niveau de l'eau) ----------
+// dessus.glb est dans le même repère que zone3_3d.glb : on l'ajoute simplement à côté du modèle.
+// Il n'entre pas dans le calcul du cadrage (ajuster() ne mesure que le modèle).
+const soleil = new THREE.DirectionalLight(0xffffff, 1.2);
+soleil.position.set(0.4, -0.6, 1);
+scene.add(soleil);
+function chargerDessus() {
+  precharge.dessus.then(buf => loader.parse(buf, './', g => {
+    g.scene.traverse(o => {
+      if (!o.isMesh) return;
+      if (o.name.startsWith('eau') || (o.material && o.material.transparent)) {
+        // niveau de l'eau : voile bleu très léger, ne masque pas les pastilles
+        o.material = preparerScan(new THREE.MeshBasicMaterial({ color: 0x5ab4e6, transparent: true, opacity: 0.11,
+                                                   depthWrite: false, side: THREE.DoubleSide }));
+        o.renderOrder = 2;
+      } else {
+        if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals();
+        o.material = preparerScan(new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+      }
+    });
+    dessus = g.scene;
+    orient.add(g.scene);
+  }, e => console.error('dessus', e))).catch(e => console.error('dessus', e));
+}
+
+// ---------- Effet d'ouverture (quand la carte est détectée) ----------
+// Un « scanner » laser cyan balaie l'île et la révèle au fur et à mesure (2 s). ?intro=aucun : simple « pop »
+const INTRO = p.get('intro') === 'aucun' ? 'aucun' : 'scan';
+const DUREE_INTRO = INTRO === 'scan' ? 2.0 : 0.8;
+const DEMO = p.get('demo') === '1';            // pour filmer l'effet image par image
+let intro = 1, dessus = null, nappe = null;
+const uScan = { uScan: { value: 1e9 }, uBande: { value: 2.5 }, uVersOrient: { value: new THREE.Matrix4() } };
+const BORNES_X = [-41, 11];                     // emprise du modèle en X (m), balayée par le scanner
+function preparerScan(mat) {
+  mat.onBeforeCompile = sh => {
+    Object.assign(sh.uniforms, uScan);         // mêmes objets uniformes pour tous les matériaux
+    sh.vertexShader = 'uniform mat4 uVersOrient;\nvarying vec3 vPosO;\n' + sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\nvPosO = (uVersOrient * modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = 'uniform float uScan;\nuniform float uBande;\nvarying vec3 vPosO;\n' + sh.fragmentShader.replace('#include <dithering_fragment>',
+      '#include <dithering_fragment>\nfloat dS = uScan - vPosO.x;\nif (dS < 0.0) discard;\n' +
+      'float lueur = 1.0 - smoothstep(0.0, uBande, dS);\ngl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(0.35, 0.95, 1.0), lueur * 0.9);');
+  };
+  mat.customProgramCacheKey = () => 'scan-' + mat.type;
+  return mat;
+}
+function creerNappe() {
+  // nappe laser verticale qui accompagne le scanner
+  nappe = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({
+    color: 0x5ff0ff, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }));
+  nappe.rotation.y = Math.PI / 2;               // plan vertical, perpendiculaire à X
+  nappe.scale.set(22, 64, 1);                   // hauteur (Z) × largeur (Y) en m
+  nappe.position.set(0, -21.7, -5);
+  nappe.visible = false;
+  orient.add(nappe);
+}
+function majIntro() {
+  orient.updateMatrixWorld(true);
+  uScan.uVersOrient.value.copy(orient.matrixWorld).invert();
+  const t = intro;
+  const enCours = t < 1 && visible;
+  if (INTRO === 'scan') {
+    const x = BORNES_X[0] + (BORNES_X[1] - BORNES_X[0] + 3) * (1 - Math.pow(1 - t, 2));
+    uScan.uScan.value = enCours ? x : 1e9;
+    uScan.uBande.value = 2.5 * (1 - t) + 0.001;
+    if (nappe) { nappe.visible = enCours; nappe.position.x = x; nappe.material.opacity = 0.22 * Math.sin(Math.PI * Math.min(1, t * 1.1)); }
+  }
+}
+
+// ---------- Chargement du modèle ----------
+const loader = new GLTFLoader();
+const draco = new DRACOLoader();
+draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/draco/gltf/');
+loader.setDRACOLoader(draco);
+loader.setMeshoptDecoder(MeshoptDecoder);
+
+precharge.modele.then(buf => loader.parse(buf, './', gltf => {
+  modele = gltf.scene;
+  progression(avance + 30);
+  // Matériaux non éclairés : rendu fidèle aux couleurs de la photogrammétrie
+  modele.traverse(o => {
+    if (!o.isMesh) return;
+    const anc = o.material;
+    const map = anc && anc.map ? anc.map : null;
+    o.material = preparerScan(new THREE.MeshBasicMaterial({
+      map,
+      color: map ? 0xffffff : (anc && anc.color ? anc.color : 0xcccccc),
+      vertexColors: !map && !!o.geometry.attributes.color,
+      side: THREE.DoubleSide,
+    }));
+  });
+  orient.add(modele);
+  creerNappe();
+  ajuster();
+  chargerDessus();
+  if (!visible) etat.textContent = texteAttente();
+}, err => { console.error(err); etat.textContent = 'Modèle illisible : ' + MODELE; }))
+.catch(err => {
+  console.error(err);
+  etat.textContent = 'Modèle introuvable : ' + MODELE;
+});
+
+// À chaque apparition de la carte : scanner. Retour après l'avoir quittée : vue réinitialisée
+// (taille de départ, centrée, sans rotation).
+let dejaVue = false;
+ancre.onTargetFound = () => {
+  visible = true;
+  if (dejaVue) recentrer();                   // retour sur la carte : vue réinitialisée…
+  anim = 0; if (!DEMO) intro = 0; dejaVue = true;   // …et le scanner rejoue à chaque apparition
+  if (!DEBUG) etat.style.display = 'none';
+};
+ancre.onTargetLost  = () => { visible = false; etat.style.display = ''; etat.textContent = texteAttente(); };
+
+// ---------- Gestes ----------
+// 1 doigt : faire tourner l'île sur elle-même (autour de son propre centre)
+// 2 doigts : zoomer (centré sur l'île, entre ½ et 2× la taille de départ)
+// double-tap : tout remettre comme au départ
+const TAILLE_DEPART = taille;
+const rayon = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+
+// Point de la carte (plan z = 0 de suivi) sous un point de l'écran, ou null
+function pointCarte(clientX, clientY) {
+  if (!visible) return null;
+  const r = rectVue();
+  ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+  rayon.setFromCamera(ndc, camVue());
+  suivi.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(suivi.matrixWorld).invert();
+  const o = rayon.ray.origin.clone().applyMatrix4(inv);
+  const b = rayon.ray.origin.clone().add(rayon.ray.direction).applyMatrix4(inv);
+  const d = b.sub(o);
+  if (Math.abs(d.z) < 1e-9) return null;
+  const t = -o.z / d.z;
+  if (t <= 0) return null;
+  return new THREE.Vector3(o.x + d.x * t, o.y + d.y * t, 0);
+}
+
+// Point visé sous les doigts : la SURFACE de l'île si on la touche (sinon le plan de la carte),
+// ramené dans le plan de la carte (on ne garde que x, y).
+function pointVise(clientX, clientY) {
+  if (!visible) return null;
+  if (modele) {
+    const r = rectVue();
+    ndc.set(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    rayon.setFromCamera(ndc, camVue());
+    suivi.updateMatrixWorld(true);
+    const touche = rayon.intersectObject(modele, true)[0];
+    if (touche) {
+      const l = suivi.worldToLocal(touche.point.clone());
+      return new THREE.Vector3(l.x, l.y, 0);
+    }
+  }
+  return pointCarte(clientX, clientY);
+}
+
+// Zoom d'un facteur k autour du point P (dans le plan de la carte) : P reste sous les doigts
+function zoomAutour(nouvelle, P) {
+  nouvelle = Math.min(TAILLE_MAX, Math.max(TAILLE_MIN, nouvelle));
+  const k = nouvelle / taille;
+  if (P) {
+    decal.position.x = P.x - k * (P.x - decal.position.x);
+    decal.position.y = P.y - k * (P.y - decal.position.y);
+  }
+  taille = nouvelle;
+}
+
+// Rotation d'un angle a autour du point C (dans le plan de la carte)
+function tournerAutour(a, C) {
+  if (C) {
+    const dx = decal.position.x - C.x, dy = decal.position.y - C.y;
+    const c = Math.cos(a), s = Math.sin(a);
+    decal.position.x = C.x + c * dx - s * dy;
+    decal.position.y = C.y + s * dx + c * dy;
+  }
+  tour.rotation.z += a;
+}
+
+function recentrer() { decal.position.set(0, 0, 0); tour.rotation.z = 0; taille = TAILLE_DEPART; }
+
+
+let pince = null, glisse = null, dernierTap = 0;
+const surBouton = e => e.target.closest && e.target.closest('button, #legende, #bLegende, #contact');
+const masquerAide = () => { info.style.display = 'none'; };
+const milieu = e => [(e.touches[0].clientX + e.touches[1].clientX) / 2, (e.touches[0].clientY + e.touches[1].clientY) / 2];
+const ecart = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+
+addEventListener('touchstart', e => {
+  if (surBouton(e)) return;
+  if (e.touches.length === 2) {
+    pince = { d: ecart(e) }; glisse = null; dernierTap = 0;
+  } else if (e.touches.length === 1) {
+    glisse = { x: e.touches[0].clientX, x0: e.touches[0].clientX, y0: e.touches[0].clientY, t0: Date.now(), tap: true };
+  }
+}, { passive: true });
+
+addEventListener('touchmove', e => {
+  if (surBouton(e)) return;
+  if (pince && e.touches.length === 2) {
+    e.preventDefault();
+    const d = ecart(e);
+        zoomAutour(taille * d / pince.d, null);   // zoom centré sur l'île : son centre ne bouge jamais
+    pince.d = d;
+    masquerAide();
+  } else if (glisse && e.touches.length === 1) {
+    e.preventDefault();
+    const x = e.touches[0].clientX;
+    // Un balayage de toute la largeur de l'écran = un tour complet
+    tournerAutour((x - glisse.x) / innerWidth * 2 * Math.PI, null);   // pivot = centre de l'île
+    glisse.x = x;
+    if (Math.abs(x - glisse.x0) > 12) glisse.tap = false;   // un glissé n'est pas un tap
+    masquerAide();
+  }
+}, { passive: false });
+
+addEventListener('touchend', e => {
+  // double-tap = deux VRAIS taps (un doigt, court, sans bouger, sans pincement entre les deux)
+  if (glisse && glisse.tap && e.touches.length === 0 && Date.now() - glisse.t0 < 250) {
+    const t = Date.now();
+    if (toucherOrganisme(glisse.x0, glisse.y0)) { dernierTap = 0; }
+    else if (t - dernierTap < 350) { recentrer(); dernierTap = 0; } else dernierTap = t;
+  } else if (e.touches.length === 0) dernierTap = 0;
+  if (e.touches.length < 2) pince = null;
+  if (e.touches.length === 0) glisse = null;
+});
+
+// Souris (test sur ordinateur) : glisser = tourner, molette = zoom vers le curseur, double-clic = recentrer
+let souris = null;
+addEventListener('mousedown', e => { if (!surBouton(e)) souris = { x: e.clientX, x0: e.clientX, y0: e.clientY }; });
+addEventListener('mouseup', e => { if (souris && Math.hypot(e.clientX - souris.x0, e.clientY - souris.y0) < 5) toucherOrganisme(e.clientX, e.clientY); });
+addEventListener('mousemove', e => {
+  if (!souris) return;
+  tournerAutour((e.clientX - souris.x) / innerWidth * 2 * Math.PI, null);
+  souris.x = e.clientX;
+});
+addEventListener('mouseup', () => { souris = null; });
+addEventListener('dblclick', recentrer);
+addEventListener('wheel', e => zoomAutour(taille * (e.deltaY < 0 ? 1.1 : 1 / 1.1), null), { passive: true });
+
+// ---------- Organismes ----------
+// organismes_zone3.json : points [x, y, z_fond, espèce] dans le repère du modèle (même géoréférencement
+// que le site) + touffes de posidonie [x, y, z_fond] semées dans les zones d'herbier (7 par m², comme le site).
+// Deux modes, un bouton chacun :
+//   « Détections IA »  : une pastille colorée par détection (couleurs de species.json)
+//   « Vue immersive »  : les organismes en 3D du site (mêmes formes et couleurs), poissons et posidonie qui ondulent
+const TAILLE_PASTILLE = 0.88;                          // m : taille du site (0,44 m) × 2
+const ECHELLE_ORG = +(p.get('org') ?? 2);              // grossissement des organismes 3D par rapport au site (6 jugé énorme → ÷3)
+const ECHELLE_TOUFFE = +(p.get('touffe') ?? 0.67);     // grossissement des touffes de posidonie (÷3 aussi)
+const LEVE = f => f === 'Teleostei' ? 0.4 : 0.3;        // hauteur au-dessus du fond (comme le site)
+
+const groupeDet = new THREE.Group(); groupeDet.visible = false; orient.add(groupeDet);
+const groupeImm = new THREE.Group(); groupeImm.visible = false; orient.add(groupeImm);
+const matsDet = [], matsOndule = [];
+
+// --- formes 3D reprises de js/index/20-3d-nature.js (v3dBuildOrganism, v3dBuildTuft, v3dMakeSway) ---
+const ORG_COULEURS = {
+  'Teleostei':  { a: '#4f4377', b: '#3C2F68', scale: 0.5 },
+  'Echinoidea': { a: '#3b2f42', b: '#6b5a6e', scale: 0.75 },   // site : 1.5 — jugés trop gros en AR, ÷2
+  'Holothuroidea': { a: '#3a2a22', b: '#7a5844', scale: 1.4 },
+  'Asteroidea': { a: '#8a2a1c', b: '#c4502e', scale: 1.4 },
+  'Codiaceae':  { a: '#2f5340', b: '#4a7355', scale: 1.1 },
+  'Cnidaria':   { a: '#8a6a63', b: '#c2a08d', scale: 1.5 },
+  '_default':   { a: '#7a8a80', b: '#a8b5ac', scale: 1 }
+};
+function pousse(pos, col, p1, p2, p3, c) { pos.push(...p1, ...p2, ...p3); for (let i = 0; i < 3; i++) col.push(c.r, c.g, c.b); }
+function triLisse(pos, col, P, C) { for (let k = 0; k < 3; k++) { pos.push(...P[k]); col.push(C[k].r, C[k].g, C[k].b); } }
+function blob(pos, col, cx, cy, cz, rx, ry, rz, seg, ring, cA, cB) {
+  for (let i = 0; i < ring; i++) for (let j = 0; j < seg; j++) {
+    const t0 = i / ring * Math.PI, t1 = (i + 1) / ring * Math.PI, p0 = j / seg * Math.PI * 2, p1 = (j + 1) / seg * Math.PI * 2;
+    const P = (t, ph) => [cx + rx * Math.sin(t) * Math.cos(ph), cy + ry * Math.sin(t) * Math.sin(ph), cz + rz * Math.cos(t)];
+    const c1 = cA.clone().lerp(cB, 1 - i / ring), c2 = cA.clone().lerp(cB, 1 - (i + 1) / ring);
+    pousse(pos, col, P(t0, p0), P(t0, p1), P(t1, p1), c1);
+    pousse(pos, col, P(t0, p0), P(t1, p1), P(t1, p0), c2);
+  }
+}
+const LUMIERE = new THREE.Vector3(0.35, -0.45, 0.82).normalize();
+function blobLisse(pos, col, cx, cy, cz, rx, ry, rz, seg, ring, cBas, cHaut, o = {}) {
+  const amb = o.amb ?? 0.5, dif = o.dif ?? 0.65;
+  const S = (t, ph) => {
+    const nx = Math.sin(t) * Math.cos(ph), ny = Math.sin(t) * Math.sin(ph), nz = Math.cos(t);
+    const n = new THREE.Vector3(nx / rx, ny / ry, nz / rz).normalize();
+    const c = cBas.clone().lerp(cHaut, Math.pow((nz + 1) / 2, o.gamma || 1));
+    let e = amb + dif * Math.max(0, n.dot(LUMIERE));
+    if (o.reflet) e += o.reflet * Math.pow(Math.max(0, n.dot(LUMIERE)), 12);
+    return { p: [cx + rx * nx, cy + ry * ny, cz + rz * nz], c: c.multiplyScalar(e) };
+  };
+  for (let i = 0; i < ring; i++) for (let j = 0; j < seg; j++) {
+    const t0 = i / ring * Math.PI, t1 = (i + 1) / ring * Math.PI, p0 = j / seg * Math.PI * 2, p1 = (j + 1) / seg * Math.PI * 2;
+    const a = S(t0, p0), b = S(t0, p1), c = S(t1, p1), d = S(t1, p0);
+    triLisse(pos, col, [a.p, b.p, c.p], [a.c, b.c, c.c]);
+    triLisse(pos, col, [a.p, c.p, d.p], [a.c, c.c, d.c]);
+  }
+}
+function construireOrganisme(famille) {
+  const base = ORG_COULEURS[famille] || ORG_COULEURS._default;
+  const cA = new THREE.Color(base.a), cB = new THREE.Color(base.b);
+  const S = base.scale || 1, pos = [], col = [];
+  if (famille === 'Teleostei') {
+    const L = 0.22 * S, Hh = 0.085 * S, Wd = 0.05 * S, z0 = 0.14 * S;
+    blobLisse(pos, col, 0, 0, z0, L, Wd, Hh, 8, 6, cB.clone().multiplyScalar(0.95), cA.clone().multiplyScalar(1.3),
+              { amb: 0.72, dif: 0.45, reflet: 0.2, gamma: 2.0 });
+    const cq = cB.clone().lerp(cA, 0.5), cqb = cB.clone().multiplyScalar(0.85);
+    const qj = [-L * 0.82, 0, z0], qH = [-L * 1.55, 0, z0 + Hh * 1.1], qB = [-L * 1.55, 0, z0 - Hh * 1.1], qM = [-L * 1.3, 0, z0];
+    [[qj, qH, qM], [qj, qM, qB]].forEach(T => { triLisse(pos, col, T, [cq, cqb, cqb]); triLisse(pos, col, [T[0], T[2], T[1]], [cq, cqb, cqb]); });
+    const noir = new THREE.Color('#05060a'), ex = L * 0.68, ez = z0 + Hh * 0.2, re = Hh * 0.12;
+    [1, -1].forEach(sd => {
+      const ey = sd * Wd * Math.sqrt(Math.max(0, 1 - (ex / L) ** 2 - ((ez - z0) / Hh) ** 2)) * 1.05;
+      for (let k = 0; k < 6; k++) {
+        const a0 = k / 6 * Math.PI * 2, a1 = (k + 1) / 6 * Math.PI * 2;
+        const e0 = [ex, ey, ez], e1 = [ex + re * Math.cos(a0), ey, ez + re * Math.sin(a0)], e2 = [ex + re * Math.cos(a1), ey, ez + re * Math.sin(a1)];
+        triLisse(pos, col, sd > 0 ? [e0, e2, e1] : [e0, e1, e2], [noir, noir, noir]);
+      }
+    });
+  } else if (famille === 'Echinoidea') {
+    const R = 0.075 * S, oBas = new THREE.Color('#2a1f30'), oHaut = new THREE.Color('#5a4560');
+    blobLisse(pos, col, 0, 0, R * 0.5, R, R, R * 0.72, 18, 9, oBas, oHaut, { amb: 0.5, dif: 0.7, reflet: 0.15 });
+    const pied = oHaut.clone().multiplyScalar(0.85), pointe = oHaut.clone(), NP = 56;
+    for (let kp = 0; kp < NP; kp++) {
+      const th = Math.acos(1 - 2 * (kp + 0.5) / NP), ph = kp * 2.399963;
+      const dx = Math.sin(th) * Math.cos(ph), dy = Math.sin(th) * Math.sin(ph), dz = Math.cos(th);
+      if (dz < -0.25) continue;
+      const bp = [dx * R * 0.85, dy * R * 0.85, R * 0.5 + dz * R * 0.62], tp = [dx * R * 1.85, dy * R * 1.85, R * 0.5 + dz * R * 1.5], w = R * 0.13;
+      let px = -dy, py = dx; const ln = Math.hypot(px, py) || 1; px /= ln; py /= ln;
+      triLisse(pos, col, [[bp[0] - w * px, bp[1] - w * py, bp[2]], [bp[0] + w * px, bp[1] + w * py, bp[2]], tp], [pied, pied, pointe]);
+      triLisse(pos, col, [[bp[0] - w * dx * dz * 0.7, bp[1] - w * dy * dz * 0.7, bp[2] + w], [bp[0] + w * dx * dz * 0.7, bp[1] + w * dy * dz * 0.7, bp[2] - w], tp], [pied, pied, pointe]);
+    }
+  } else if (famille === 'Codiaceae') {
+    const Rb = 0.09 * S;
+    blob(pos, col, 0, 0, Rb * 0.8, Rb, Rb, Rb * 0.7, 8, 4, cA, cB);
+    for (let n = 0; n < 5; n++) {
+      const an = n / 5 * Math.PI * 2 + 0.5, rr = Rb * (0.45 + Math.random() * 0.25);
+      blob(pos, col, Math.cos(an) * Rb * 0.7, Math.sin(an) * Rb * 0.7, Rb * (0.7 + Math.random() * 0.5), rr, rr, rr * 0.85, 6, 3, cA, cB);
+    }
+  } else if (famille === 'Cnidaria') {
+    const Hc = 0.11 * S, Rc = 0.032 * S;
+    blob(pos, col, 0, 0, Hc * 0.5, Rc, Rc, Hc * 0.5, 7, 3, cA, cB);
+    for (let t2 = 0; t2 < 11; t2++) {
+      const a2 = t2 / 11 * Math.PI * 2, ux = Math.cos(a2), uy = Math.sin(a2), len = Hc * (0.75 + Math.random() * 0.6);
+      const mid = [ux * Rc * 1.5, uy * Rc * 1.5, Hc + len * 0.55], end = [ux * (Rc + len * 0.9), uy * (Rc + len * 0.9), Hc + len * 0.35];
+      const b1 = [ux * Rc * 0.5 - uy * Rc * 0.35, uy * Rc * 0.5 + ux * Rc * 0.35, Hc * 0.95], b2 = [ux * Rc * 0.5 + uy * Rc * 0.35, uy * Rc * 0.5 - ux * Rc * 0.35, Hc * 0.95];
+      const m2 = [mid[0] + uy * Rc * 0.2, mid[1] - ux * Rc * 0.2, mid[2]];
+      pousse(pos, col, b1, b2, mid, cB); pousse(pos, col, b2, b1, mid, cB);
+      pousse(pos, col, mid, m2, end, cB); pousse(pos, col, m2, mid, end, cB);
+    }
+  } else {
+    const Rd = 0.07 * S; blob(pos, col, 0, 0, Rd, Rd, Rd, Rd, 8, 4, cA, cB);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+const HERBE = { H: 0.8, W: 0.05, BEND: 0.7, SPREAD: 0.75, LAMES: 12, BASE: '#1e3a24',
+                POINTES: ['#5f8f3e', '#4a7433', '#6f9a45', '#8a9a3c', '#3f6b2f', '#9aa84a'], VAR: 0.28 };
+function construireTouffe() {
+  const pos = [], col = [];
+  for (let b = 0; b < HERBE.LAMES; b++) {
+    const ang = b / HERBE.LAMES * Math.PI * 2 + Math.random() * 0.6, dx = Math.cos(ang), dy = Math.sin(ang);
+    const h = HERBE.H * (0.65 + Math.random() * 0.55), bend = HERBE.BEND * (0.5 + Math.random()), perpX = -dy, perpY = dx;
+    const shade = 1 + (Math.random() - 0.5) * 2 * HERBE.VAR;
+    const cBase = new THREE.Color(HERBE.BASE).multiplyScalar(shade);
+    const cTip = new THREE.Color(HERBE.POINTES[Math.floor(Math.random() * HERBE.POINTES.length)]).multiplyScalar(shade);
+    const reach = HERBE.SPREAD * (0.45 + Math.random() * 0.85);
+    const lv = [{ t: 0, w: HERBE.W, off: 0 }, { t: 0.55, w: HERBE.W * 0.7, off: reach * 0.3 }, { t: 1, w: HERBE.W * 0.16, off: reach }];
+    lv.forEach(L => { L.x = dx * (L.off + 0.02); L.y = dy * (L.off + 0.02); L.z = h * L.t * (1 - 0.45 * L.t * bend); L.c = cBase.clone().lerp(cTip, L.t); });
+    for (let q = 0; q < 2; q++) {
+      const A = lv[q], B = lv[q + 1];
+      const a1 = [A.x + perpX * A.w, A.y + perpY * A.w, A.z], a2 = [A.x - perpX * A.w, A.y - perpY * A.w, A.z];
+      const b1 = [B.x + perpX * B.w, B.y + perpY * B.w, B.z], b2 = [B.x - perpX * B.w, B.y - perpY * B.w, B.z];
+      pos.push(...a1, ...a2, ...b2, ...a1, ...b2, ...b1);
+      [A.c, A.c, B.c, A.c, B.c, B.c].forEach(c => col.push(c.r, c.g, c.b));
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  return g;
+}
+// Ondulation calculée par la carte graphique (coût processeur nul)
+function onduler(mat, mode) {
+  mat.onBeforeCompile = shader => {
+    shader.uniforms.uTime = { value: 0 };
+    shader.uniforms.uAmp = { value: mode === 'fish' ? 0.03 : 0.035 };
+    shader.uniforms.uHeight = { value: HERBE.H };
+    shader.vertexShader = 'uniform float uTime;\nuniform float uAmp;\nuniform float uHeight;\n' + shader.vertexShader;
+    const inj = mode === 'fish'
+      ? ['float ph = transformed.x * 0.7 + transformed.y * 0.9;',
+         '#ifdef USE_INSTANCING', '  ph += instanceMatrix[3][0] * 1.7 + instanceMatrix[3][2] * 2.3;', '#endif',
+         'transformed.x += sin(uTime + ph) * uAmp;', 'transformed.z += cos(uTime * 0.8 + ph) * uAmp * 0.6;'].join('\n')
+      : ['float hh = clamp(max(transformed.z, 0.0) / max(0.001, uHeight), 0.0, 1.0);', 'float bend = hh * hh * hh;',
+         'float ph = transformed.x * 9.0 + transformed.y * 7.0;',
+         '#ifdef USE_INSTANCING', '  ph += instanceMatrix[3][0] * 1.3 + instanceMatrix[3][2] * 1.9;', '#endif',
+         'transformed.x += sin(uTime + ph) * uAmp * bend;', 'transformed.y += cos(uTime * 0.85 + ph * 1.3) * uAmp * bend * 0.6;'].join('\n');
+    shader.vertexShader = shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n' + inj);
+    mat.userData.shader = shader;
+  };
+  mat.customProgramCacheKey = () => 'ondule-' + mode;
+  matsOndule.push(mat);
+  return mat;
+}
+function majOndulation(t) {
+  if (!groupeImm.visible) return;
+  matsOndule.forEach(m => { const sh = m.userData.shader; if (sh) sh.uniforms.uTime.value = t * 1.1; });
+}
+function instances(geo, mat, liste) {
+  const im = new THREE.InstancedMesh(geo, mat, liste.length), mx = new THREE.Matrix4(), q = new THREE.Quaternion();
+  const axeZ = new THREE.Vector3(0, 0, 1), v = new THREE.Vector3(), e = new THREE.Vector3();
+  liste.forEach((t, i) => { q.setFromAxisAngle(axeZ, t.rot); v.set(t.x, t.y, t.z); e.setScalar(t.e); mx.compose(v, q, e); im.setMatrixAt(i, mx); });
+  im.instanceMatrix.needsUpdate = true; im.frustumCulled = false;
+  return im;
+}
+
+function texturePastille() {
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.beginPath(); g.arc(32, 32, 26, 0, Math.PI * 2);
+  g.fillStyle = 'rgba(255,255,255,0.55)'; g.fill();
+  g.lineWidth = 7; g.strokeStyle = 'rgba(255,255,255,1)'; g.stroke();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
+const orgPoints = [], orgEspeces = {};
+precharge.organismes.then(d => {
+  const fam = id => (d.especes[id] && d.especes[id].famille) || '';
+  Object.assign(orgEspeces, d.especes);
+  d.points.forEach(([x, y, z, id, temp]) => {
+    if (!ORG_COULEURS[fam(id)] && fam(id) !== 'Magnoliopsida') return;
+    orgPoints.push({ id, prof: Math.abs(z), temp: temp ?? null, posDet: new THREE.Vector3(x, y, z + LEVE(fam(id))),
+                     posImm: new THREE.Vector3(x, y, z + LEVE(fam(id)) * 0.3 + 0.15) });
+  });
+  // --- Détections IA : pastilles ---
+  const tex = texturePastille();
+  const lots = { petit: { pos: [], col: [] }, normal: { pos: [], col: [] } };
+  const c = new THREE.Color();
+  d.points.forEach(([x, y, z, id]) => {
+    const lot = id === 'Chromis' ? lots.petit : lots.normal;
+    lot.pos.push(x, y, z + LEVE(fam(id)));
+    c.set(d.especes[id] ? d.especes[id].couleur : '#ffffff'); lot.col.push(c.r, c.g, c.b);
+  });
+  for (const [nom, lot] of Object.entries(lots)) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(lot.pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(lot.col, 3));
+    const mat = new THREE.PointsMaterial({ map: tex, vertexColors: true, transparent: true, depthWrite: false, alphaTest: 0.05, sizeAttenuation: true });
+    mat.userData.facteur = nom === 'petit' ? 0.6 : 1;
+    matsDet.push(mat);
+    groupeDet.add(new THREE.Points(geo, mat));
+  }
+  // --- Vue immersive : un objet instancié par famille + touffes de posidonie ---
+  const parFamille = {};
+  d.points.forEach(([x, y, z, id]) => {
+    const f = fam(id);
+    if (!ORG_COULEURS[f]) return;                         // la posidonie est rendue en touffes, pas en organisme
+    (parFamille[f] = parFamille[f] || []).push({ x, y, z: z + LEVE(f) * 0.3, rot: Math.random() * Math.PI * 2,
+                                                  e: (0.8 + Math.random() * 0.45) * ECHELLE_ORG });
+  });
+  for (const [f, liste] of Object.entries(parFamille)) {
+    let mat = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+    if (f === 'Teleostei') mat = onduler(mat, 'fish');
+    groupeImm.add(instances(construireOrganisme(f), mat, liste));
+  }
+  if (d.touffes && d.touffes.length) {
+    const liste = d.touffes.map(([x, y, z]) => ({ x, y, z, rot: Math.random() * Math.PI * 2, e: (0.8 + Math.random() * 0.4) * ECHELLE_TOUFFE }));
+    const mat = onduler(new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }), 'grass');
+    groupeImm.add(instances(construireTouffe(), mat, liste));
+  }
+  // --- légende (commune aux deux modes) ---
+  const lignes = Object.entries(d.especes).map(([id, e]) => ({ ...e, id })).map(e =>
+    `<div class="l"><i style="background:${e.couleur}8c;border-color:${e.couleur}"></i>${nomEspece(e.id, e)}` +
+    ` <small>${e.detectees.toLocaleString(langue)}${e.affichees < e.detectees ? ' ' + t('affichees')(e.affichees) : ''}</small></div>`).join('');
+  document.getElementById('legende').innerHTML =
+    `<div class="tete"><b>${t('legendeTitre')}</b><button class="fermer" title="Fermer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button></div>${lignes}`;
+  document.querySelector('#legende .fermer').onclick = () => ouvrirLegende(false);
+}).catch(e => console.error('organismes', e));
+
+// --- boutons : un seul mode à la fois ---
+// Sélecteur de vue : Relief (île seule) · Détections IA (pastilles) · Immersion (organismes 3D)
+const boutonsMode = [...document.querySelectorAll('#reglages button')];
+const pastille = document.querySelector('#reglages .pastille');
+function placerPastille() {
+  const b = boutonsMode.find(x => x.classList.contains('actif'));
+  if (b) { pastille.style.left = b.offsetLeft + 'px'; pastille.style.width = b.offsetWidth + 'px'; }
+}
+function afficherMode(mode) {
+  groupeDet.visible = mode === 'det';
+  groupeImm.visible = mode === 'imm';
+  boutonsMode.forEach(b => b.classList.toggle('actif', b.dataset.mode === (mode || 'ile')));
+  placerPastille();
+  // bouton Légende en haut à gauche : seulement en mode Détections IA (la liste s'ouvre en le touchant)
+  document.getElementById('bLegende').style.display = mode === 'det' ? 'flex' : 'none';
+  if (mode !== 'det') ouvrirLegende(false);
+}
+function ouvrirLegende(oui) {
+  document.getElementById('legende').style.display = oui ? 'block' : 'none';
+  document.getElementById('bLegende').classList.toggle('ouvert', oui);
+}
+document.getElementById('bLegende').onclick = () =>
+  ouvrirLegende(document.getElementById('legende').style.display !== 'block');
+boutonsMode.forEach(b => b.onclick = () => afficherMode(b.dataset.mode === 'ile' ? null : b.dataset.mode));
+addEventListener('resize', placerPastille);
+requestAnimationFrame(placerPastille);
+
+// la taille des pastilles suit l'échelle de l'île (zoom compris)
+const _echelle = new THREE.Vector3();
+function majPastilles() {
+  if (!groupeDet.visible || !matsDet.length) return;
+  orient.updateMatrixWorld(true);
+  _echelle.setFromMatrixScale(orient.matrixWorld);
+  matsDet.forEach(m => { m.size = TAILLE_PASTILLE * m.userData.facteur * _echelle.x; });
+}
+
+if (DEMO) window._demo = t => { intro = t; anim = Math.min(1, t * DUREE_INTRO / 0.8); };
+
+// ---------- Fiche d'un organisme touché (même contenu que la fiche 3D du site) ----------
+// Au toucher : on projette les ~900 points à l'écran et on prend le plus proche du doigt (< 30 px).
+// Coût : moins d'une milliseconde, seulement au moment du toucher. La fiche suit ensuite l'organisme.
+// Symboles de famille : copiés de js/index/10-filtre.js (FAMILY_ICONS)
+var FAMILY_ICONS = {
+        'Cnidaria': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M14 40 h20"/><path d="M17 40 c0-6 1.5-9 7-9 s7 3 7 9"/><path d="M24 31 V14"/><path d="M18 30 C14 26 10 24 6 25"/><path d="M20 29 C17 22 13 18 9 16"/><path d="M24 28 C23 20 22 14 24 8"/><path d="M28 29 C31 22 35 18 39 16"/><path d="M30 30 C34 26 38 24 42 25"/><path d="M21 29 C19 24 16 20 15 13"/><path d="M27 29 C29 24 32 20 33 13"/></svg>',
+        'Echinoidea': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><circle cx="24" cy="26" r="10" fill="currentColor" fill-opacity="0.25"/><path d="M24.0 15.4 L24.0 6.0"/><path d="M27.6 16.0 L30.0 9.6"/><path d="M30.8 17.9 L36.9 10.7"/><path d="M33.2 20.7 L39.2 17.2"/><path d="M34.4 24.2 L43.7 22.5"/><path d="M34.4 27.8 L41.2 29.0"/><path d="M33.2 31.3 L41.3 36.0"/><path d="M30.8 34.1 L35.2 39.4"/><path d="M27.6 36.0 L30.8 44.8"/><path d="M24.0 36.6 L24.0 43.5"/><path d="M20.4 36.0 L17.2 44.8"/><path d="M17.2 34.1 L12.8 39.4"/><path d="M14.8 31.3 L6.7 36.0"/><path d="M13.6 27.8 L6.8 29.0"/><path d="M13.6 24.2 L4.3 22.5"/><path d="M14.8 20.7 L8.8 17.2"/><path d="M17.2 17.9 L11.1 10.7"/><path d="M20.4 16.0 L18.0 9.6"/></svg>',
+        'Holothuroidea': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M8 29 C8 22 14 19 21 20 C27 21 31 17 37 17 C42 17 44 21 43 25 C42 30 36 31 30 31 C23 31 19 35 13 35 C10 35 8 33 8 29 Z" fill="currentColor" fill-opacity="0.25"/><path d="M8 29 l-3.5 -2.5 M8 29 l-4 1 M8.6 31.6 l-3 2.6"/><circle cx="17" cy="25" r="1.3" fill="currentColor"/><circle cx="24" cy="24.6" r="1.3" fill="currentColor"/><circle cx="31" cy="22.4" r="1.3" fill="currentColor"/><circle cx="37.5" cy="21.6" r="1.3" fill="currentColor"/><circle cx="20.5" cy="30" r="1.3" fill="currentColor"/><circle cx="34" cy="27" r="1.3" fill="currentColor"/></svg>',
+        'Asteroidea': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5 L28.2 18.2 L42 18.5 L30.8 26.6 L35.2 40.2 L24 32 L12.8 40.2 L17.2 26.6 L6 18.5 L19.8 18.2 Z" fill="currentColor" fill-opacity="0.25"/><circle cx="24" cy="24.5" r="1.4" fill="currentColor"/><circle cx="24" cy="12.5" r="1.1" fill="currentColor"/><circle cx="34" cy="21" r="1.1" fill="currentColor"/><circle cx="30.5" cy="33" r="1.1" fill="currentColor"/><circle cx="17.5" cy="33" r="1.1" fill="currentColor"/><circle cx="14" cy="21" r="1.1" fill="currentColor"/></svg>',
+        /* Sable : petit tas de grains */
+        'Substrat': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 40 h36"/><circle cx="14" cy="36" r="3.4" fill="currentColor" fill-opacity="0.25"/><circle cx="21.5" cy="36.2" r="3.4" fill="currentColor" fill-opacity="0.25"/><circle cx="29" cy="36" r="3.4" fill="currentColor" fill-opacity="0.25"/><circle cx="36" cy="36.4" r="3" fill="currentColor" fill-opacity="0.25"/><circle cx="17.8" cy="29.6" r="3.4" fill="currentColor" fill-opacity="0.25"/><circle cx="25.4" cy="29.4" r="3.4" fill="currentColor" fill-opacity="0.25"/><circle cx="32.6" cy="30" r="3" fill="currentColor" fill-opacity="0.25"/><circle cx="21.6" cy="23" r="3.4" fill="currentColor" fill-opacity="0.25"/><circle cx="28.8" cy="23.4" r="3" fill="currentColor" fill-opacity="0.25"/><circle cx="25.2" cy="16.8" r="3" fill="currentColor" fill-opacity="0.25"/></svg>',
+        /* Déchet (plastique) : bouteille */
+        'Dechet': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 5h8v5c0 2 5 4 5 9v21a3 3 0 01-3 3H18a3 3 0 01-3-3V19c0-5 5-7 5-9z" fill="currentColor" fill-opacity="0.25"/><path d="M15 25h18M15 33h18"/></svg>',
+        'Teleostei': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 24 C12 15 20 12 28 14 C34 16 38 20 40 24 C38 28 34 32 28 34 C20 36 12 33 6 24 Z" fill="currentColor" fill-opacity="0.2"/><path d="M40 24 L46 17 V31 Z" fill="currentColor" fill-opacity="0.2"/><circle cx="14.5" cy="22" r="1.6" fill="currentColor" stroke="none"/><path d="M24 15 C26 19 26 29 24 33"/></svg>',
+        'Magnoliopsida': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 42 h24"/><path d="M18 42 C16 32 15 20 18 8"/><path d="M24 42 C24 30 24 18 23 6"/><path d="M30 42 C32 33 33 22 30 10"/><path d="M13 42 C12 36 10 28 12 22"/><path d="M35 42 C36 36 38 30 36 24"/></svg>',
+        '_rocheux': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 39 h42"/><path d="M13 39 L10.5 31 C9.8 27.5 11.5 23.5 15 21.5 L21 18.5 C25 16.8 29.5 18 31.8 21 L34.6 25.5 C36 28.8 35.6 33 33.8 39 Z" fill="currentColor" fill-opacity="0.22"/><path d="M4.5 39 L5.2 34.2 C5.7 31.5 8.2 30 10.8 30.8 L12.4 31.5"/><path d="M35 39 L35 32.8 C35.4 29.8 38 28.2 40.6 29.6 L43.2 31.6 C44.4 33.6 44.5 36.4 43.6 39 Z" fill="currentColor" fill-opacity="0.22"/><path d="M15 21.5 L19.5 28 L17.5 34.5"/><path d="M21 18.5 L25.5 25.5 L24.5 32"/><path d="M31.8 21 L28 28.5 L30 34.5"/></svg>',
+        'Codiaceae': '<svg viewBox="0 0 48 48" width="46" height="46" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M24 5 c3.5 0 5 2.6 8 3.4 c3 0.8 5.6 0.2 7.4 2.8 c1.8 2.6 0.3 5 1 8 c0.7 3 2.6 4.6 1.6 7.6 c-1 3-3.4 3.6-5.2 6 c-1.8 2.4-1.8 5-4.6 6.2 c-2.8 1.2-4.8-0.6-8.2-0.6 c-3.4 0-5.4 1.8-8.2 0.6 c-2.8-1.2-2.8-3.8-4.6-6.2 c-1.8-2.4-4.2-3-5.2-6 c-1-3 0.9-4.6 1.6-7.6 c0.7-3-0.8-5.4 1-8 c1.8-2.6 4.4-2 7.4-2.8 c3-0.8 4.5-3.4 8-3.4 Z" fill="currentColor" fill-opacity="0.2"/><circle cx="24" cy="24" r="6" fill="currentColor" fill-opacity="0.3" stroke-width="1.8"/></svg>'
+    };
+const ficheEl = document.getElementById('fiche');
+let ficheCible = null;
+const _v = new THREE.Vector3();
+function versEcran(pLocal) {
+  _v.copy(pLocal).applyMatrix4(orient.matrixWorld).project(camVue());
+  const r = rectVue();
+  return { x: (_v.x + 1) / 2 * r.width + r.left, y: (1 - _v.y) / 2 * r.height + r.top, devant: _v.z < 1 };
+}
+function toucherOrganisme(x, y) {
+  if (!(groupeDet.visible || groupeImm.visible) || !orgPoints.length || !suivi.visible) return false;
+  orient.updateMatrixWorld(true);
+  let meilleur = null, dMin = 30 * 30;
+  for (const o of orgPoints) {
+    const e = versEcran(groupeImm.visible ? o.posImm : o.posDet);
+    if (!e.devant) continue;
+    const d2 = (e.x - x) ** 2 + (e.y - y) ** 2;
+    if (d2 < dMin) { dMin = d2; meilleur = o; }
+  }
+  if (!meilleur) { ficheCible = null; ficheEl.style.display = 'none'; return false; }
+  const sp = orgEspeces[meilleur.id] || {};
+  const col = sp.couleur || '#7dd3fc', sci = (sp.latin || '').replace(/^\(+|\)+$/g, '');
+  ficheEl.innerHTML =
+    `<div class="pe" style="border-left-color:${col}">` +
+    (FAMILY_ICONS[sp.famille] ? `<span class="pe-ico" style="color:${col}">${FAMILY_ICONS[sp.famille]}</span>` : `<span class="pe-rond" style="border-color:${col}"></span>`) +
+    `<span class="pe-noms"><span class="pe-nom">${nomEspece(meilleur.id, sp)}</span>${sci ? '<i class="pe-sci">' + sci + '</i>' : ''}</span></div>` +
+    `<div class="prof"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="22"/><polyline points="5,15 12,22 19,15"/></svg>${nombre(meilleur.prof, 2)} m</div>` +
+    (meilleur.temp != null ? `<div class="prof"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fb7a4f" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.5a4 4 0 11-4 0V4a2 2 0 014 0z"/><line x1="12" y1="9" x2="12" y2="14"/></svg>${nombre(meilleur.temp, 1)} °C</div>` : '');
+  ficheCible = meilleur;
+  ficheEl.style.display = 'block';
+  majFiche();
+  return true;
+}
+function majFiche() {
+  if (!ficheCible) return;
+  if (!(groupeDet.visible || groupeImm.visible) || !suivi.visible) { ficheEl.style.display = 'none'; return; }
+  orient.updateMatrixWorld(true);
+  const e = versEcran(groupeImm.visible ? ficheCible.posImm : ficheCible.posDet);
+  ficheEl.style.display = e.devant ? 'block' : 'none';
+  // la fiche reste entièrement à l'écran, même si l'organisme est près d'un bord
+  const demi = ficheEl.offsetWidth / 2 + 8;
+  ficheEl.style.left = Math.min(innerWidth - demi, Math.max(demi, e.x)) + 'px';
+  ficheEl.style.top = Math.max(ficheEl.offsetHeight + 22, e.y) + 'px';
+}
+
+// ---------- Démarrage ----------
+const horloge = new THREE.Clock();
+function image() {                         // une image : mêmes calculs dans les deux modes
+  const dt = Math.min(horloge.getDelta(), 0.1);
+  lisserSuivi(dt);
+  if (visible && anim < 1 && !DEMO) anim = Math.min(1, anim + dt / 0.8);
+  if (visible && intro < 1 && !DEMO) intro = Math.min(1, intro + dt / DUREE_INTRO);
+  appliquerPose();
+  majIntro();
+  majFiche();
+  majPastilles();
+  majOndulation(horloge.elapsedTime);
+}
+function erreurDemarrage(texte, err) {
+  if (err && (err.name === 'NotAllowedError' || etatCamera === 'denied')) texte = t('cameraBloquee');
+  etat.innerHTML = texte;
+  document.getElementById('accueilTexte').innerHTML = texte;
+  document.getElementById('barre').style.display = 'none';
+  document.querySelector('#accueil .retour').style.display = 'block';
+}
+
+if (!LIBRE) {
+  try {
+    etat.textContent = t('demarrageCamera');
+    document.getElementById('accueilTexte').textContent = t('demarrageCamera');
+    rampe = setInterval(() => progression(avance + (95 - avance) * 0.05), 100);
+    await mindar.start();
+    if (modele) etat.textContent = texteAttente();
+    clearInterval(rampe); progression(100);
+    setTimeout(() => accueilEl.classList.add('fini'), 350);   // la caméra est prête : on dévoile
+    renderer.setAnimationLoop(() => { image(); renderer.render(scene, camera); });
+  } catch (e) {
+    console.error(e);
+    erreurDemarrage(t('erreurCamera'), e);
+  }
+} else {
+  // ---------- Mode « n'importe où » (WebXR, Android + Chrome) ----------
+  // 1) on cherche une surface horizontale (cercle blanc) ; 2) un toucher pose l'île dessus, face au téléphone ;
+  // 3) ensuite tout fonctionne comme avec la carte (gestes, modes, fiches, contact). « Déplacer l'île » la repose.
+  const ECHELLE_XR = +(p.get('echelleXR') ?? 0.35);   // m par largeur de carte : île ≈ 0,42 m au départ
+  const reticule = new THREE.Mesh(new THREE.RingGeometry(0.075, 0.095, 40).rotateX(-Math.PI / 2),
+                                  new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9 }));
+  reticule.matrixAutoUpdate = false; reticule.visible = false;
+  scene.add(reticule);
+  let session = null, sourceVisee = null, posee = false;
+  const _pos = new THREE.Vector3(), _cam = new THREE.Vector3(), _haut = new THREE.Vector3();
+  const _rot = new THREE.Matrix4(), _couche = new THREE.Matrix4().makeRotationX(-Math.PI / 2), _ech = new THREE.Matrix4();
+  function poser() {
+    // position du cercle ; rotation : l'île est tournée face au téléphone (bas de la « carte » vers l'utilisateur)
+    _pos.setFromMatrixPosition(reticule.matrix);
+    _cam.setFromMatrixPosition(renderer.xr.getCamera().matrixWorld);
+    const ang = Math.atan2(-(_pos.x - _cam.x), -(_pos.z - _cam.z));
+    _rot.makeRotationY(ang).setPosition(_pos);
+    _ech.makeScale(ECHELLE_XR, ECHELLE_XR, ECHELLE_XR);
+    suivi.matrix.copy(_rot).multiply(_couche).multiply(_ech);   // repère carte : Z (sortie de carte) = vertical
+    suivi.matrixWorldNeedsUpdate = true;
+    suivi.visible = true; visible = true; posee = true;
+    reticule.visible = false;
+    anim = 0; if (!DEMO) intro = 0;                        // scanner à chaque pose
+    document.body.classList.add('posee');
+    etat.style.display = 'none';
+  }
+  document.getElementById('bReplacer').onclick = () => {
+    posee = false; visible = false; suivi.visible = false;
+    document.body.classList.remove('posee');
+    etat.style.display = ''; etat.textContent = texteAttente();
+  };
+  // Les touchers sur l'interface ne doivent pas poser l'île
+  document.querySelectorAll('#reglages, #bLegende, #legende, #bContact, #contact, #fiche, #bReplacer')
+    .forEach(el => el.addEventListener('beforexrselect', e => e.preventDefault()));
+  try {
+    document.getElementById('accueilTexte').textContent = t('demarrageRA');
+    session = await choix.session;
+    renderer.xr.setReferenceSpaceType('local');
+    await renderer.xr.setSession(session);
+    const espaceVue = await session.requestReferenceSpace('viewer');
+    sourceVisee = await session.requestHitTestSource({ space: espaceVue });
+    document.documentElement.classList.add('xr'); document.body.classList.add('xr');
+    if (!session.domOverlayState) console.warn('dom-overlay non accordé : interface invisible');
+    progression(100);
+    accueilEl.classList.add('fini');
+    etat.style.display = ''; etat.textContent = texteAttente();
+    session.addEventListener('select', () => { if (!posee && reticule.visible) poser(); });
+    session.addEventListener('end', () => location.reload());   // retour (bouton Android) : écran de choix
+    renderer.setAnimationLoop((t, frame) => {
+      if (frame && sourceVisee && !posee) {
+        const res = frame.getHitTestResults(sourceVisee);
+        const pose = res.length ? res[0].getPose(renderer.xr.getReferenceSpace()) : null;
+        // surfaces horizontales seulement (l'axe « haut » de la surface doit être vertical)
+        const horizontale = pose && _haut.set(0, 1, 0).applyMatrix4(_rot.fromArray(pose.transform.matrix).setPosition(0, 0, 0)).y > 0.9;
+        reticule.visible = !!horizontale;
+        if (horizontale) reticule.matrix.fromArray(pose.transform.matrix);
+        if (reticuleVu !== !!horizontale) { reticuleVu = !!horizontale; etat.textContent = texteAttente(); }
+      }
+      image();
+      renderer.render(scene, camera);
+    });
+  } catch (e) {
+    console.error(e);
+    erreurDemarrage(t('erreurRA'), e);
+  }
+}
+</script>
+</body>
+</html>
