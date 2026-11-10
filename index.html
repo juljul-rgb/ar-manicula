@@ -180,6 +180,20 @@
     #choix .opt img.ico { padding: 10px; box-sizing: border-box; }
     #choix .opt small { display: block; margin-top: 2px; font-weight: 400; font-size: 11.5px; color: #9fbccb; }
     #choix .opt[disabled] { opacity: .45; cursor: default; }
+    #popPC { position: fixed; inset: 0; z-index: 9999; display: none; align-items: center; justify-content: center; padding: 24px;
+      background: rgba(3,14,22,.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+    #popPC.ouvert { display: flex; animation: popFond .25s ease; }
+    #popPC .carteP { max-width: 340px; width: 100%; text-align: center; padding: 26px 24px 22px; border-radius: 20px;
+      background: #0b2231; border: 1px solid rgba(14,165,233,.45); box-shadow: 0 0 6px 2px rgba(14,165,233,.35), 0 18px 40px rgba(0,0,0,.45);
+      animation: popCarte .3s cubic-bezier(.2,.9,.3,1.2); }
+    #popPC .icoP { width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      color: #fbbf5a; background: rgba(251,191,90,.12); border: 1px solid rgba(251,191,90,.35); }
+    #popPC .titreP { font-weight: 600; font-size: 17px; color: #fff; margin-bottom: 8px; }
+    #popPC p { margin: 0 0 20px; font-size: 14px; line-height: 1.5; color: #b9cfdc; }
+    #popPC button { border: 0; border-radius: 999px; padding: 11px 26px; font: inherit; font-weight: 600; font-size: 14px;
+      color: #062033; background: #fff; cursor: pointer; }
+    @keyframes popFond { from { opacity: 0 } to { opacity: 1 } }
+    @keyframes popCarte { from { opacity: 0; transform: translateY(10px) scale(.96) } to { opacity: 1; transform: none } }
     #choix .note { text-align: center; font-size: 12px; line-height: 1.4; color: #8fb0c2; }
     #choix .note:empty { display: none; }
     #accueil .retour { display: none; margin-top: 4px; padding: 10px 20px; border-radius: 999px; border: 1px solid rgba(255,255,255,.3);
@@ -422,6 +436,12 @@
       <div id="barre"><i></i></div><div id="accueilTexte" data-i18n="chargement">Chargement…</div>
       <button class="retour" onclick="location.reload()" data-i18n="retour">Retour</button>
     </div>
+    <div id="popPC" role="dialog" aria-modal="true"><div class="carteP">
+      <div class="icoP"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div class="titreP" data-i18n="popTitre"></div>
+      <p data-i18n="bandeauPC"></p>
+      <button id="popOk" data-i18n="popOk"></button>
+    </div></div>
     <div id="voileInfo"></div><div id="infoIle"></div>
   </div>
   <button id="bOptions"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 5 8 12 15 19"/></svg><span data-i18n="options">Revenir aux options</span></button>
@@ -462,7 +482,8 @@ const TEXTES = {
     carte: "J'ai la carte de visite", carteSous: 'Visez la carte avec le téléphone',
     libre: "Je n'ai pas la carte de visite", libreSous: "Faire depuis n'importe où",
     quickLookSous: "Sur iPhone, sans la carte, vous verrez l'île en 3D <b>sans les espèces</b> détectées. Touchez à nouveau le bouton pour l'ouvrir.",
-    noteLibre: "« N'importe où » : disponible sur iPhone et sur Android avec Chrome (si le téléphone gère la réalité augmentée).",
+    popTitre: "Vous êtes sur un ordinateur", popOk: "J'ai compris",
+    bandeauPC: "Pour admirer pleinement la réalité augmentée, ouvrez plutôt cette page sur votre téléphone.",
     chargement: 'Chargement…', demarrageCamera: 'Démarrage de la caméra…', demarrageRA: 'Démarrage de la réalité augmentée…',
     retour: 'Retour', options: 'Revenir aux options', deplacer: "Déplacer l'île",
     erreurCamera: 'Caméra indisponible (autorisation refusée ou page non HTTPS)',
@@ -487,7 +508,8 @@ const TEXTES = {
     carte: 'I have the business card', carteSous: 'Point your phone at the card',
     libre: "I don't have the business card", libreSous: 'View it anywhere',
     quickLookSous: 'On iPhone, without the card, you will see the island in 3D <b>without the detected species</b>. Tap the button again to open it.',
-    noteLibre: '“Anywhere” works on iPhone, and on Android with Chrome (if the phone supports augmented reality).',
+    popTitre: "You're on a computer", popOk: "Got it",
+    bandeauPC: "To fully enjoy the augmented reality, please open this page on your phone instead.",
     chargement: 'Loading…', demarrageCamera: 'Starting the camera…', demarrageRA: 'Starting augmented reality…',
     retour: 'Back', options: 'Back to options', deplacer: 'Move island',
     erreurCamera: 'Camera unavailable (permission denied or page not served over HTTPS)',
@@ -652,7 +674,6 @@ function appliquerLangue() {
   document.getElementById('cQuickLook').href = './ile_zone3.usdz#' + q.toString().replace(/\+/g, '%20');
   construireContact();
   construireInfo();
-  const note = document.getElementById('choixNote'); if (note.textContent) note.textContent = t('noteLibre');
 }
 const menuLangue = document.getElementById('menuLangue');
 document.getElementById('bLangue').onclick = e => { e.stopPropagation(); menuLangue.classList.toggle('ouvert'); };
@@ -669,6 +690,14 @@ document.getElementById('bOptions').onclick = () => {
   const u = new URL(location.href); u.searchParams.delete('mode'); location.href = u.toString();
 };
 
+// ---------- Bandeau : connexion depuis un ordinateur ----------
+(function () {
+  const ua = navigator.userAgent || '';
+  const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const pop = document.getElementById('popPC');
+  if (!mobile) pop.classList.add('ouvert');
+  pop.addEventListener('click', e => { if (e.target === pop || e.target.id === 'popOk') pop.classList.remove('ouvert'); });
+})();
 // ---------- Écran de choix : carte de visite ou n'importe où ----------
 // Carte : suivi d'image MindAR (tous téléphones). N'importe où : WebXR (Android + Chrome, interface complète)
 // ou, sur iPhone (pas de WebXR dans Safari), la visionneuse 3D d'Apple (AR Quick Look) avec le fichier USDZ.
@@ -688,7 +717,6 @@ function majOptionLibre() {
   if (xrPossible) return;
   if (quickLook) { bLibre.style.display = 'none'; lienQuickLook.style.display = 'flex'; return; }
   bLibre.disabled = true;
-  choixNote.textContent = t('noteLibre');
 }
 // iPhone : 1er toucher = avertissement (pas d'espèces sans la carte), 2e toucher = ouverture de la vue 3D Apple
 let qlPrevenu = false;
